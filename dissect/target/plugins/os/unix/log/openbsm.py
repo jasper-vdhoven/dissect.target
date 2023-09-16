@@ -15,20 +15,6 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-OpenBSMRecord = TargetRecordDescriptor(
-    "bsd/log/openbsm",
-    [
-        ("datetime", "ts"),
-        # OpenBSM audit trail fields
-        ("string", "date"),
-        ("string", "msec"),
-        ("int", "port"),
-        ("int", "ip-address-type")
-        ("int", "ip-address"),
-
-    ]
-)
-
 aurecord_def = """
 /*
  * Structs pulled from https://github.com/openbsm/openbsm/blob/54a0c07cf8bac71554130e8f6760ca68e5f36c7f/bsm/libbsm.h
@@ -728,8 +714,22 @@ typedef struct {
 """
 # TODO: add Solaris parsing support
 
-aurecord = cstruct(endian=">")
-aurecord.load(aurecord_def, compiled=True)
+c_aurecord = cstruct(endian=">")
+c_aurecord.load(aurecord_def, compiled=True)
+
+OpenBSMRecord = TargetRecordDescriptor(
+    "bsd/log/openbsm",
+    [
+        ("datetime", "ts"),
+        # OpenBSM audit trail fields
+        ("string", "date"),
+        ("string", "msec"),
+        ("int", "port"),
+        ("int", "ip-address-type"),
+        ("int", "ip-address"),
+
+    ]
+)
 
 
 def get_optional(value: str, to_type: Callable):
@@ -750,7 +750,7 @@ class OpenBSMFile:
 
 
 class OpenBSMPlugin(Plugin):
-    AUDIT_PATHS = ["/var/audit"]  # TODO: get path dynamically from /etc/security/audit_control config file
+    AUDIT_PATH = ["/var/audit"]  # TODO: get path dynamically from /etc/security/audit_control config file
     """
         There are three possible file names to match for:
         20211014091059.20211014112919 // where there two sets of 14 digits
@@ -766,25 +766,25 @@ class OpenBSMPlugin(Plugin):
     AUDIT_GLOB = "*"
     
     # Target here is the path to our evidence
-    def __init__(self, target: Target):
-        super().__init__(target)
-        self.audit_paths = []
+    # def __init__(self, target: Target):
+    #     super().__init__(target)
+    #     self.audit_paths = []
 
-        for _path in self.AUDIT_PATHS:
-            print(f"[i] - {_path}")
-            self.audit_paths.extend(self.target.fs.path(_path).glob(self.AUDIT_GLOB))
+    #     for _path in self.AUDIT_PATH:
+    #         print(f"[i] - {_path}")
+    #         self.audit_paths.extend(self.target.fs.path(_path).glob(self.AUDIT_GLOB))
 
     def check_compatible(self) -> None:
-        if not len(self.audit_paths):
-            raise UnsupportedPluginError("No OpenBSM audit trail files found")
+        if not self.target.fs.path(self.AUDIT_PATH).exists():
+            raise UnsupportedPluginError("No OpenBSM log files found")
 
     @export(record=OpenBSMRecord)
-    def openbsm(self) -> Iterator[OpenBSMRecord]:
+    def openbsm(self) -> OpenBSMRecord:
         """Return the contents of OpenBSM Audit Trail log files.
         """
-        for _path in self.audit_paths:
-            print(f"[i] Currently reading: {_path}")
-            fh = _path.open()
+        for file in self.target.fs.path(self.AUDIT_PATH).gob(self.AUDIT_GLOB):
+            print(f"[i] Currently reading: {file}")
+            fh = file.open()
 
             openbsm_log = OpenBSMRecord(fh, self.target)
 
