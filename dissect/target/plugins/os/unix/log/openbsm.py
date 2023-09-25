@@ -1,10 +1,7 @@
-from dissect.cstruct import cstruct, dumpstruct
-import logging
-from datetime import datetime as DT
-from time import time as TT
-# from progress.bar import Bar
+from dissect.cstruct import cstruct, dumpstruct, Instance
+from dissect.cstruct.utils import pack, p8 ,p32, hexdump
+from enum import Enum
 import os.path
-import argparse
 
 from typing import Iterator, BinaryIO, Callable
 from dissect.util import ts
@@ -714,10 +711,54 @@ typedef struct {
     uint8_t         data_items[unit_count * 1 << butype];
 } au_data_t;
 """
+
+class RecordMagic(Enum):
+    AU_INVALID_T = 00
+    AU_TRAILER_T = 19
+    AU_HEADER32_T = 20
+    AU_HEADER32_EX_T = 21
+    AU_DATA_T = 33
+    AU_IPC_T = 34
+    AU_PATH_T = 35
+    AU_SUBJECT32_T = 36
+    AU_PROC32_T = 38
+    AU_RET32_T = 39
+    AU_TEXT_T = 40
+    AU_OPAQUE_T = 41
+    AU_INADDR_T = 42
+    AU_IP_T = 43
+    AU_IPORT_T = 44
+    AU_ARG32_T = 45
+    AU_SOCKET_T = 46
+    AU_SEQ_T = 47
+    AU_IPCPERM_T = 50
+    AU_GROUPS_T = 52
+    AU_EXECARG_T = 60
+    AU_EXECENV_T = 61
+    AU_ATTR32_t = 62
+    AU_EXIT_T = 82
+    AU_ARG64_T = 113
+    AU_RET64_t = 114
+    AU_ATTR64_T = 115
+    AU_HEADER64_T = 116
+    AU_SUBJECT64_T = 117
+    AU_PROCESS64_T = 119
+    AU_HEADER64_EXT_T = 121
+    AU_SUBJECT32EX_T = 122
+    AU_PROC32EX_T = 123
+    AU_SUBJECT64EX_T = 124
+    AU_PROCESS64EX_T = 125
+    AU_INADDR_EX_T = 126
+    AU_SOCKETEX32_T = 127
+    AU_SOCKETINET32_T = 128
+    AU_SOCKETINET128_T = 129
+    AU_UNIXSOCK_T = 130
+    AU_IDENTITY_INFO = 237
+
 # TODO: add Solaris parsing support
 
-c_aurecord = cstruct(endian=">")
-c_aurecord.load(aurecord_def, compiled=True)
+aurecord = cstruct(endian=">")
+aurecord.load(aurecord_def, compiled=True)
 
 OpenBSMRecord = TargetRecordDescriptor(
     "bsd/log/openbsm",
@@ -745,10 +786,235 @@ class OpenBSMFile:
     References:
 
     """
-
-    def __init__(self, fh: BinaryIO, target: Target):
+    def __init__(self, fh: BinaryIO):
+        fh.seek(0)
         self.fh = fh
-        self.target = target
+
+    def __iter__(self) -> Iterator[Instance]:
+        while True:
+            try:
+                reclen, buf = fetch_and_check_header(self.fh)
+                bytes_read = 0
+                while reclen != -1:
+                    while bytes_read < reclen:
+                        # print(f"[i] current byte: {buf[bytes_read]}")
+                        match buf[bytes_read]:
+                            case RecordMagic.AU_TRAILER_T.value:
+                                trailer_t = aurecord.au_trailer_t(buf[bytes_read + 1:])
+                                # sizeof au_trailer_t + 1 extra byte to go to the next struct
+                                bytes_read += 6 + 1
+                                yield  trailer_t
+                            case RecordMagic.AU_HEADER32_T.value:
+                                header32_t = aurecord.au_header32_t(buf[bytes_read + 1:])
+                                # sizeof au_header32_t + 1 extra byte to go to the next struct
+                                bytes_read += 17 + 1
+                                yield header32_t
+                            case RecordMagic.AU_HEADER32_EX_T.value:
+                                header32ex_t = aurecord.au_header32_ex_t(buf[bytes_read + 1:])
+                                bytes_read += (16 + 16 + 1 + 4 ) + 1
+                                yield header32ex_t
+                            case RecordMagic.AU_DATA_T.value:
+                                data_t = aurecord.au_data_t(buf[bytes_read + 1:])
+                                bytes_read += 3 + data_t._sizes['data_items'] + 1
+                                yield data_t
+                            case RecordMagic.AU_IPC_T.value:
+                                ipc_t = aurecord.au_ipc_t(buf[bytes_read + 1:])
+                                bytes_read += 5 + 1
+                                yield ipc_t
+                            case RecordMagic.AU_PATH_T.value:
+                                path_t = aurecord.au_path_t(buf[bytes_read + 1:])
+                                # sizeof au_path_t + 1 extra byte to go to the next struct
+                                bytes_read += 2 + path_t.len + 1
+                                yield path_t
+                            case RecordMagic.AU_SUBJECT32_T.value:
+                                subject32_t = aurecord.au_subject32_t(buf[bytes_read + 1:])
+                                # sizeof au_subject32_t + 1 extra byte to go to the next struct
+                                bytes_read += 36 +1
+                                yield subject32_t
+                            case RecordMagic.AU_PROC32_T.value:
+                                proc32_t = aurecord.au_proc32_t(buf[bytes_read + 1:])
+                                bytes_read += 36 + 1
+                                yield proc32_t
+                            case RecordMagic.AU_RET32_T.value:
+                                ret32_t = aurecord.au_ret32_t(buf[bytes_read + 1:])
+                                # sizeof au_ret32_t + 1 extra byte to go to the next struct
+                                bytes_read += 5 + 1
+                                yield ret32_t
+                            case RecordMagic.AU_TEXT_T.value:
+                                text_t = aurecord.au_text_t(buf[bytes_read + 1:])
+                                # sizeof au_text_t + 1 extra byte to go to the next struct
+                                bytes_read += text_t.len + 2 + 1
+                                yield text_t
+                            case RecordMagic.AU_OPAQUE_T.value:
+                                opaque_t = aurecord.au_opaque_t(buf[bytes_read + 1:])
+                                bytes_read += 3 + opaque_t._sizes['data_items'] + 1
+                                yield opaque_t
+                            case RecordMagic.AU_INADDR_T.value:
+                                inaddr_t = aurecord.au_inaddr_t(buf[bytes_read + 1:])
+                                bytes_read += 4 + 1
+                                yield inaddr_t
+                            case RecordMagic.AU_IP_T.value:
+                                ip_t = aurecord.au_ip_t(buf[bytes_read + 1:])
+                                bytes_read += (4 + 8 + 8) + 1
+                                yield ip_t
+                            case RecordMagic.AU_IPORT_T.value:
+                                iport_t = aurecord.au_iport_t(buf[bytes_read + 1:])
+                                bytes_read += 2 + 1
+                                yield iport_t
+                            case RecordMagic.AU_ARG32_T.value:
+                                arg32_t = aurecord.au_arg32_t(buf[bytes_read + 1:])
+                                # sizeof au_arg32_t + 1 extra byte to go to the next struct
+                                bytes_read += arg32_t.len + 7 + 1
+                                yield arg32_t
+                            case RecordMagic.AU_SOCKET_T.value:
+                                socket_t = aurecord.au_socket_t(buf[bytes_read + 1:])
+                                bytes_read += (6 + 8) + 1
+                                yield socket_t
+                            case RecordMagic.AU_SEQ_T.value:
+                                seq_t = aurecord.au_seq_t(buf[bytes_read + 1:])
+                                bytes_read += 4 + 1
+                                yield seq_t
+                            case RecordMagic.AU_IPCPERM_T.value:
+                                ipcperm_t = aurecord.au_ipcperm_t(buf[bytes_read + 1:])
+                                bytes_read += 28 + 1
+                                yield ipcperm_t
+                            case RecordMagic.AU_EXECARG_T.value:
+                                execarg_t = aurecord.au_execarg_t(buf[bytes_read + 1:])
+                                """
+                                    Since we don't know the exact length, iterate over all seperate arguments
+                                    and add their size to the total count
+                                """
+                                length = 0
+                                for items in execarg_t.text:
+                                    length += len(items) + 1
+                                length += 4 + 1
+                                bytes_read += length
+                                yield execarg_t
+                            case RecordMagic.AU_EXECENV_T.value:
+                                execenv_t = aurecord.au_execenv_t(buf[bytes_read + 1:])
+                                length = 0
+                                for items in execenv_t.text:
+                                    length += len(items) + 1
+                                length += 4 + 1
+                                bytes_read += length
+                                yield execenv_t
+                            case RecordMagic.AU_ATTR32_t.value:
+                                attr32_t = aurecord.au_attr32_t(buf[bytes_read + 1:])
+                                #sizeof au_attr32_t + 1 extra byte to go to the next struct
+                                bytes_read += 28 + 1
+                                yield attr32_t
+                            case RecordMagic.AU_EXIT_T.value:
+                                exit_t = aurecord.au_exit_t(buf[bytes_read + 1:])
+                                bytes_read += 8 + 1
+                                yield exit_t
+                            case RecordMagic.AU_ARG64_T.value:
+                                arg64_t = aurecord.au_arg64_t(buf[bytes_read + 1:])
+                                bytes_read += (1 + 8 + 2) + arg64_t.len + 1
+                                yield arg64_t
+                            case RecordMagic.AU_RET64_t.value:
+                                ret64_t = aurecord.au_ret64_t(buf[bytes_read + 1:])
+                                bytes_read += 9 + 1
+                                yield ret64_t
+                            case RecordMagic.AU_ATTR64_T.value:
+                                attr64_t = aurecord.au_attr64_t(buf[bytes_read + 1:])
+                                bytes_read += 32 + 1
+                                yield attr64_t
+                            case RecordMagic.AU_HEADER64_T.value:
+                                header64_t = aurecord.au_header64_t(buf[bytes_read + 1:])
+                                bytes_read += 25 + 1
+                                yield header64_t
+                            case RecordMagic.AU_SUBJECT64_T.value:
+                                subject64_t = aurecord.au_subject64_t(buf[bytes_read + 1:])
+                                bytes_read += 28 + 12 + 1
+                                yield subject64_t
+                            case RecordMagic.AU_PROCESS64_T.value:
+                                proc64_t = aurecord.au_proc64_t(buf[bytes_read + 1:])
+                                bytes_read += 28 + 12 + 1
+                                yield proc64_t
+                            case RecordMagic.AU_HEADER64_EXT_T.value:
+                                header64_ex_t = aurecord.au_header64_ex_t(buf[bytes_read + 1:])
+                                bytes_read += 12 + 4 + 1 + 16 + 1
+                                yield header64_ex_t
+                            case RecordMagic.AU_SUBJECT32EX_T.value:
+                                subject32ex_t = aurecord.au_subject32ex_t(buf[bytes_read + 1:])
+                                # sizeof au_subject32ex_t + 1 extra byte to go to the next struct
+                                bytes_read += 40 + 1
+                                yield subject32ex_t
+                            case RecordMagic.AU_PROC32EX_T.value:
+                                proc32ex_t = aurecord.au_proc32ex_t(buf[bytes_read + 1:])
+                                bytes_read += (28 + 12) + 1
+                                yield proc32ex_t
+                            case RecordMagic.AU_SUBJECT64EX_T.value:
+                                subject64ex_t = aurecord.au_subject64ex_t(buf[bytes_read + 1:])
+                                bytes_read += 28 + 12 + 16 + 1
+                                yield subject64ex_t
+                            case RecordMagic.AU_PROCESS64EX_T.value:
+                                process64ex_t = aurecord.au_proc64ex_t(buf[bytes_read + 1:])
+                                bytes_read += 28 + 12 + 16 + 1
+                                yield process64ex_t
+                            case RecordMagic.AU_INADDR_EX_T.value:
+                                inaddr_ex_t = aurecord.au_inaddr_ex_t(buf[bytes_read + 1:])
+                                bytes_read += 20 + 1
+                                yield inaddr_ex_t
+                            case RecordMagic.AU_SOCKETEX32_T.value:
+                                socketex_t = aurecord.au_socket_ex_t(buf[bytes_read + 1:])
+                                length = socketex_t.atype * 2
+                                bytes_read += (10 + length) + 1
+                                yield socketex_t
+                            case RecordMagic.AU_SOCKETINET32_T.value:
+                                socketinet32_t = aurecord.au_socketinet32_t(buf[bytes_read + 1:])
+                                bytes_read += 8 + 1
+                                yield socketinet32_t
+                            case RecordMagic.AU_SOCKETINET128_T.value:
+                                socketinet128_t = aurecord.au_socketinet128_t(buf[bytes_read + 1:])
+                                bytes_read += 20 + 1
+                                yield socketinet128_t
+                            case RecordMagic.AU_UNIXSOCK_T.value:
+                                unixsock_t = aurecord.au_unixsock_t(buf[bytes_read + 1:])
+                                # TODO: Find a way to dynamically calculate the size of this record
+                                bytes_read += (2 + unixsock_t._sizes['path']) + 1
+                                yield unixsock_t
+                            case RecordMagic.AU_IDENTITY_INFO.value:
+                                identity_info = aurecord.au_identity_info(buf[bytes_read + 1:])
+                                length = identity_info.signer_id_length + identity_info.team_id_length + identity_info.cdhash_length
+                                bytes_read += (4 + 2 + 2 + 2 + 2) + length + 1
+                                yield identity_info
+                            case RecordMagic.AU_INVALID_T.value:
+                                invalid_t = aurecord.au_invalid_t(buf[bytes_read + 1:])
+                                bytes_read += 2 + invalid_t.len + 1
+                                yield invalid_t
+                            case _:
+                                print(hexdump(buf))
+                                print(f"[i] First byte of buf: {buf[bytes_read]}")
+                                print(f"[i] Type of buf:       {type(buf[bytes_read])}")
+                                break
+                    try:
+                        reclen, buf = fetch_and_check_header(self.fh)
+                        bytes_read = 0
+                    except EOFError:
+                        break
+            except EOFError:
+                break
+            break
+
+def fetch_and_check_header(fh):
+    header_magic = fh.read(1)
+    match header_magic:
+        case b"\x14":
+            # Get the size of the record we are reading
+            recsize: int = aurecord.uint32(fh)
+            full_rec = fh.read(recsize - 5)
+            # repack the 4 bytes as BE and add the remaining bytes
+            buf: bytes = header_magic + p32(recsize, "big") + full_rec
+            return recsize, buf
+        case b"":
+            print("[!] EOF reached!")
+            # fh.close()
+        case _:
+            print("[!] Invalid record")
+            hexdump(fh.read(10))
+            # fh.close()
+            raise Exception
 
 
 class OpenBSMPlugin(Plugin):
@@ -777,490 +1043,34 @@ class OpenBSMPlugin(Plugin):
     #         self.audit_paths.extend(self.target.fs.path(_path).glob(self.AUDIT_GLOB))
 
     def check_compatible(self) -> None:
+        print("[i] Made it to compat check")
         if not self.target.fs.path(self.AUDIT_PATH).exists():
             raise UnsupportedPluginError("No OpenBSM log files found")
 
     @export(record=OpenBSMRecord)
     def openbsm(self) -> OpenBSMRecord:
+        print("[i] Made it to openbsm() function")
         """Return the contents of OpenBSM Audit Trail log files.
         """
-        for file in self.target.fs.path(self.AUDIT_PATH).gob(self.AUDIT_GLOB):
+        for file in self.target.fs.path(self.AUDIT_PATH).glob(self.AUDIT_GLOB):
             print(f"[i] Currently reading: {file}")
             fh = file.open()
 
-            openbsm_log = OpenBSMRecord(fh, self.target)
+            openbsm_log = OpenBSMFile(fh)
 
+            for entry in openbsm_log:
+                print(f"\t{entry}")
+                print(f"{type(entry)}")
+                yield OpenBSMRecord
 
-
-# # Custom exception class for when a record type has not yet been implemented
-# # TODO: figure out a way to better handle this; it is better than the non-error from before, but does not feel ideal.
-# class UnknownRecordType(Exception):
-#     def __init__(self, message):
-#         super().__init__(message)
-
-
-# class Bar(Bar):
-#     fill = "*"
-#     suffix = '%(remaining)d Bytes left - %(elapsed)d Seconds elapsed'
-
-
-# # define arg parser
-# args_parser = argparse.ArgumentParser(prog='OpenBSM Parser',
-#                                       description='A Python parser for the OpenBSM file format utilising Dissect.Cstruct parsing logic', )
-# args_parser.add_argument('-i', '--input', action='store', nargs=1, required=True,
-#                          metavar='./20211014090822.20211014090900', help='Path to location of OpenBSM audit log')
-# args_parser.add_argument('-o', '--output', action='store', nargs=1, metavar='./20211014090822.20211014090900.xml',
-#                          help='Path to output file for parsed records. If no output is specified, the input file name will be used and extended with ".xml"')
-# args_parser.add_argument('-p', '--passwd', action='store', nargs=1, metavar='./passwd',
-#                          help='Path to the system of origin\'s /etc/passwd equivalent file')
-# args_parser.add_argument('-g', '--groups', action='store', nargs=1, metavar='./groups',
-#                          help='Path to the system of origin\'s /etc/groups equivalent file')
-# args_parser.add_argument('-l', '--loglevel', action='store', nargs=1,
-#                          metavar='ERROR',
-#                          help='Log level setter, default value is ERROR. Valid options are: DEBUG, INFO, WARN, ERROR, and CRIT')
-# args_parser.add_argument('-f', '--logfile', action='store', nargs=1, metavar='./output-log.log',
-#                          help='File path of where to write the log file to. If no value is specified the input file will be used and extended with ".log"')
-# args_parser.add_argument('-d', '--defs', action='store', nargs=1, metavar='./struct-definitions.txt',
-#                          help="Path to struct definitions to use.")
-
-# active_args = args_parser.parse_args()
-
-# # Set logging info
-# custom_level_formats = {
-#     logging.DEBUG:      "[+] DEBUG",
-#     logging.INFO:       "[i] INFO ",
-#     logging.WARNING:    "[!] WARN ",
-#     logging.ERROR:      "[E] ERROR",
-#     logging.CRITICAL:   "[X] CRIT ",
-# }
-
-# for level, format_str in custom_level_formats.items():
-#     logging.addLevelName(level, format_str)
-
-# # Create Logger
-# logger = logging.getLogger('OpenBSM-Parser')
-# if active_args.loglevel:
-#     match active_args.loglevel[0]:
-#         case "DEBUG":
-#             logger.setLevel(logging.DEBUG)
-#         case "INFO":
-#             logger.setLevel(logging.INFO)
-#         case "WARN":
-#             logger.setLevel(logging.WARN)
-#         case "ERROR":
-#             logger.setLevel(logging.WARN)
-#         case "CRIT":
-#             logger.setLevel(logging.CRITICAL)
-#         case _:
-#             logger.setLevel(logging.ERROR)
-#             print(
-#                 f"[!] invalid logging level: {active_args.loglevel[0]}; setting logging level to ERROR")
-# else:
-#     logger.setLevel(logging.ERROR)
-
-# # Set format of log messages
-# # TODO: make the time appear here again, it apperas to be missing in actual logging output
-# logging_format = logging.Formatter(
-#     "%(levelname)s - %(asctime)s - %(name)s - %(message)s")
-# if active_args.logfile:
-#     logging.basicConfig(filename=active_args.logfile[0], encoding="utf-8")
-# else:
-#     logging.basicConfig(
-#         filename=f"{active_args.input[0]}.log", encoding='utf-8')
-
-
-# def uid_to_name(fh):
-#     passwd_dict = {}
-#     with open(fh, "r+") as f:
-#         for line in f:
-#             if line.startswith('#'):
-#                 continue
-#             fields = line.split(':')
-#             name = fields[0]
-#             uid = int(fields[2])
-#             passwd_dict[uid] = name
-#     return passwd_dict
-
-
-# def main():
-#     # Define output file name
-#     if active_args.output:
-#         output_file = active_args.output[0]
-#     else:
-#         output_file = f"{active_args.input[0]}.xml"
-
-#     try:
-#         logger.info(f'Attempting to open file: {active_args.input[0]}')
-#         fh = open(active_args.input[0], "rb")
-#     except FileNotFoundError:
-#         logging.error(f"Could not open file: {active_args.input[0]}")
-#         raise FileNotFoundError
-
-#     print("[-] Valid file path given; starting parser")
-#     not_empty = True
-#     clean = True
-
-#     record_count = 0
-#     with open(f"{output_file}", "w+") as f:
-#         f.write("<?xml version='1.0'?>\n<audit>\n")
-
-#         # passwd parsing testing location
-#         if active_args.passwd:
-#             passwd_dict = uid_to_name(active_args.passwd[0])
-#         if active_args.groups:
-#             groups_dict = uid_to_name(active_args.groups[0])
-
-#         # Progress bar creation
-#         bar = Bar('Bytes read', max=int(os.path.getsize(active_args.input[0])))
-
-#         # start perf timer HERE
-#         start_time = TT()
-#         while not_empty:
-#             # Check the first byte for record type
-#             logger.info("Reading one byte to determine record type")
-#             header_type = fh.read(1)
-#             bar.goto(fh.tell())
-
-#             match header_type:
-#                 case b"\x00":
-#                     token_type = "AUINVALID_T"
-#                     logger.info(
-#                         f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     auinvalid_t = aurecord.auinvalid_t(fh)
-#                 case b"\x13":
-#                     token_type = "AU_TRAILER_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_trailer_t = aurecord.au_trailer_t(fh)
-#                     logger.info(f"Record end reached; returning for next record")
-#                     record_count += 1
-#                     f.write("\t</record>\n")
-#                 case b"\x14":
-#                     token_type = "AU_HEADER32_T"
-#                     logger.info("Record start; parsing record contents")
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_header32_t = aurecord.au_header32_t(fh)
-#                     logger.debug(f"Writing record to disk as XML")
-#                     f.write(
-#                         f'\t<record version="{au_header32_t.version}" event="{au_header32_t.e_type}" modifier="{au_header32_t.e_mod}" time="{DT.fromtimestamp(au_header32_t.s).strftime("%c")}" msec= " + {au_header32_t.ms} msec" >\n')
-#                 case b"\x15":
-#                     token_type = "AU_HEADER32_EX_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_header32_ex_t = aurecord.au_header32_ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x21":
-#                     token_type = "AU_DATA_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_data_t = aurecord.au_data_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x22":
-#                     token_type = "AUIPC_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     auipc_t = aurecord.auipc_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x23":
-#                     token_type = "AU_PATH_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_path_t = aurecord.au_path_t(fh)
-#                     logger.debug(f"Writing record to disk as XML")
-#                     f.write(f'\t\t<path>{au_path_t.path.decode("utf-8")}</path>\n')
-#                 case b"\x24":
-#                     token_type = "AU_SUBJECT32_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_subject32_t = aurecord.au_subject32_t(fh)
-#                     if au_subject32_t.auid == 4294967295:
-#                         au_subject32_t.auid = 0
-#                     logger.debug(f"Writing record to disk as XML")
-#                     if active_args.passwd and active_args.groups:
-#                         f.write(
-#                             f'\t\t<subject audit-uid="{passwd_dict.get(au_subject32_t.auid)}" uid="{passwd_dict.get(au_subject32_t.euid)}" gid="{groups_dict.get(au_subject32_t.egid)}" ruid="{passwd_dict.get(au_subject32_t.ruid)}" rgid="{groups_dict.get(au_subject32_t.rgid)}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
-#                     elif active_args.passwd:
-#                         f.write(
-#                             f'\t\t<subject audit-uid="{passwd_dict.get(au_subject32_t.auid)}" uid="{passwd_dict.get(au_subject32_t.euid)}" gid="{au_subject32_t.egid}" ruid="{passwd_dict.get(au_subject32_t.ruid)}" rgid="{au_subject32_t.rgid}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
-#                     elif active_args.groups:
-#                         f.write(
-#                             f'\t\t<subject audit-uid="{au_subject32_t.auid}" uid="{au_subject32_t.euid}" gid="{groups_dict.get(au_subject32_t.egid)}" ruid="{au_subject32_t.ruid}" rgid="{groups_dict.get(au_subject32_t.rgid)}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
-#                     else:
-#                         f.write(
-#                             f'\t\t<subject audit-uid="{au_subject32_t.auid}" uid="{au_subject32_t.euid}" gid="{au_subject32_t.egid}" ruid="{au_subject32_t.ruid}" rgid="{au_subject32_t.rgid}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
-#                 case b"\x26":
-#                     token_type = "AU_PROC32_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_proc32_t = aurecord.au_proc32_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x27":
-#                     token_type = "AU_RET32_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_ret32_t = aurecord.au_ret32_t(fh)
-#                     logger.debug(f"Writing record to disk as XML")
-#                     f.write(f'\t\t<return errval="{au_ret32_t.status}" retval="{au_ret32_t.ret}"/>\n')
-#                 case b"\x28":
-#                     token_type = "AU_TEXT_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_text_t = aurecord.au_text_t(fh)
-#                     au_text_text = au_text_t.text.decode("utf-8")
-#                 case b"\x29":
-#                     token_type = "AU_OPAQUE_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_opaque_t = aurecord.au_opaque_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x2a":
-#                     token_type = "AUINADDR_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_inaddr_t = aurecord.au_inaddr_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x2b":
-#                     token_type = "AUIP_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     auip_t = aurecord.auip_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x2c":
-#                     token_type = "AUIPORT_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     auiport_t = aurecord.auiport_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x2d":
-#                     token_type = "AU_ARG32_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_arg32_t = aurecord.au_arg32_t(fh)
-#                     logger.debug(f"Writing record to disk as XML")
-#                     f.write(
-#                         f'\t\t<argument arg-num="{au_arg32_t.no}" value="{au_arg32_t.val}" desc="{au_arg32_t.text.decode("utf-8")}"/>\n')
-#                 case b"\x2e":
-#                     token_type = "AU_SOCKET_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_socket_t = aurecord.au_socket_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x2f":
-#                     token_type = "AU_SEQ_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_seq_t = aurecord.au_seq_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x31":
-#                     token_type = "AU_ATTR_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_attr_t = aurecord.au_attr_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x32":
-#                     token_type = "AUIPCPERM_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     auipcperm_t = aurecord.auipcperm_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x34":
-#                     token_type = "AU_GROUPS_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_groups_t = aurecord.au_groups_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x38":
-#                     token_type = "AU_PRIV_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_priv_t = aurecord.au_priv_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x3c":
-#                     token_type = "AU_EXECARG_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_execarg_t = aurecord.au_execarg_t(fh)
-#                     f.write('\t\t<exec_args>')
-#                     for items in au_execarg_t.text:
-#                         f.write(f'\n\t\t\t<arg>{items.decode("utf-8")}</arg>')
-#                     f.write('\n\t\t</exec_args>\n')
-#                 case b"\x3d":
-#                     token_type = "AU_EXECENV_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_execenv_t = aurecord.au_execenv_t(fh)
-#                     f.write('<exec_env>')
-#                     for items in au_execenv_t.text:
-#                         f.write(f'<env>{items.decode("utf-8")}</env>')
-#                     f.write('</exec_env>\n')
-#                 case b"\x3e":
-#                     token_type = "AU_ATTR32_t"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_attr32_t = aurecord.au_attr32_t(fh)
-#                     logger.debug(f"Writing record to disk as XML")
-#                     if active_args.passwd and active_args.groups:
-#                         f.write(
-#                             f'\t\t<attribute mode="{au_attr32_t.mode}" uid="{passwd_dict.get(au_attr32_t.uid)}" gid="{groups_dict.get(au_attr32_t.gid)}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
-#                     elif active_args.passwd:
-#                         f.write(
-#                             f'\t\t<attribute mode="{au_attr32_t.mode}" uid="{passwd_dict.get(au_attr32_t.uid)}" gid="{au_attr32_t.gid}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
-#                     elif active_args.groups:
-#                         f.write(
-#                             f'\t\t<attribute mode="{au_attr32_t.mode}" uid="{au_attr32_t.uid}" gid="{passwd_dict.get(au_attr32_t.gid)}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
-#                     else:
-#                         f.write(
-#                             f'\t\t<attribute mode="{au_attr32_t.mode}" uid="{au_attr32_t.uid}" gid="{au_attr32_t.gid}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
-#                 case b"\x52":
-#                     token_type = "AU_EXIT_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_exit_t = aurecord.au_exit_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x60":
-#                     token_type = "AU_ZONENAME_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_zonename_t = aurecord.au_zonename_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x71":
-#                     token_type = "AU_ARG64_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_arg64_t = aurecord.au_arg64_t(fh)
-#                     f.write(
-#                         f'\t\t<argument arg-num="{au_arg64_t.no}" value="{au_arg64_t.val}" desc="{au_arg64_t.text.decode("utf-8")}"/>\n')
-#                 case b"\x72":
-#                     token_type = "AU_RET64_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_ret64_t = aurecord.au_ret64_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x73":
-#                     token_type = "AU_ATTR64_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_attr64_t = aurecord.au_attr64_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x74":
-#                     token_type = "AU_HEADER64_t"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_header64_t = aurecord.au_header64_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x75":
-#                     token_type = "AU_SUBJECT64_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_subject64_t = aurecord.au_subject64_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x77":
-#                     token_type = "AU_PROCESS64_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_proc64_t = aurecord.au_proc64_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x79":
-#                     token_type = "AU_HEADER64_EX_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_header64_ex_t = aurecord.au_header64_ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x7a":
-#                     token_type = "AU_SUBJECT32EX_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_subject32ex_t = aurecord.au_subject32ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x7b":
-#                     token_type = "AU_PROC32EXT_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_proc32ex_t = aurecord.au_proc32ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x7c":
-#                     token_type = "AU_SUBJECT64EX_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_subject64ex_t = aurecord.au_subject64ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x7d":
-#                     token_type = "AU_PROC64EX_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_proc64ex_t = aurecord.au_proc64ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x7e":
-#                     token_type = "AU_INADDR_EX_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_inaddr_ex_t = aurecord.au_inaddr_ex_t(fh)
-#                     logger.warning(f"XML support not (yet) implemented for this type!")
-#                 case b"\x7f":
-#                     token_type = "AU_SOCKET_EX32_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_socket_ex32_t = aurecord.au_socket_ex32_t(fh)
-#                     f.write(
-#                         f'<socket sock-dom="{hex(au_socket_ex32_t.domain)}" sock-type="{hex(au_socket_ex32_t.atype)}" lport="{au_socket_ex32_t.l_port}" laddr="{au_socket_ex32_t.l_addr}" faddr="{au_socket_ex32_t.r_addr}" fport="{au_socket_ex32_t.r_port}" />\n')
-#                 case b"\x80":
-#                     token_type = "AU_SOCKETINET32_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_socketinet32_t = aurecord.au_socketinet32_t(fh)
-#                     f.write(
-#                         f'<socket-inet type="{au_socketinet32_t.family}" port="{au_socketinet32_t.port}" addr="{au_socketinet32_t.addr}" />\n')
-#                 case b"\x81":
-#                     token_type = "AU_SOCKETINET128_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_socketinet128_t = aurecord.au_socketinet128_t(fh)
-#                     f.write(
-#                         f'<socket-inet6 type="{au_socketinet128_t.socket_family}" port="{au_socketinet128_t.l_port}" addr="{au_socketinet128_t.addr}" />\n')
-#                 case b"\x82":
-#                     token_type = "AU_UNIXSOCKET_T"
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_socketunix_t = aurecord.au_unixsock_t_special(fh)
-#                     logger.debug(f"Writing record to disk as XML")
-#                     f.write(
-#                         f'<socket-unix type="{au_socketunix_t.family}" port="" addr="{au_socketunix_t.addr.decode("utf-8")}" />\n')
-#                 case b"\xed":
-#                     token_type = "AUT_IDENTITY_INFO 0xED"
-#                     logger.info("macOS specific record encountered")
-#                     logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
-#                     logger.debug(f"Parsing memory for type: {token_type}")
-#                     au_identity_info = aurecord.au_identity_info(fh)
-#                     logger.debug("Writing record to disk as XML")
-#                     f.write(
-#                         f'\t\t<identity signer-type="{au_identity_info.signer_type}" signing-id="{au_identity_info.signing_id.decode("utf-8")}" signing-id-truncated="{au_identity_info.signing_id_trunc}" team-id="{au_identity_info.team_id.decode("utf-8")}" team-id-truncated="{au_identity_info.team_id_trunc}" cdhash="{au_identity_info.cdhash.hex()}" />\n')
-#                 case b"":
-#                     logger.info("End of file reached; no errors occurred getting here")
-#                     logger.info("Exiting loop on clean state & writing collected XML to disk")
-#                     f.write("</audit>")
-#                     end_time = TT()
-#                     # Calculate and display running time:
-#                     run_time = end_time - start_time
-#                     print(f"\n[-] Time spent crunching records: {run_time:.2f} seconds")
-#                     # return amount of records parsed
-#                     print(f"[-] Final record count is: {record_count}")
-#                     not_empty = False
-#                     bar.finish()
-#                     fh.close()
-#                 case _:
-#                     logger.error(
-#                         f"\nEncountered invalid record byte: {header_type}; this might be because it is not (yet) supported or a bug!")
-#                     logger.error(
-#                         f"\nWriting collected XML to disk; then exiting on non-zero exit code")
-#                     clean = False
-#                     fh.close()
-#                     raise UnknownRecordType(
-#                         f"Read unexpected header indicator byte of type: {header_type}. This is either because the source file is corrupted, or a the parser has a bug.")
-
-#     logger.info("Exiting on exit code 0; all good to go!")
-
-
-# if __name__ == "__main__":
-#     main()
+    # def uid_to_name(fh):
+    #     passwd_dict = {}
+    #     with open(fh, "r+") as f:
+    #         for line in f:
+    #             if line.startswith('#'):
+    #                 continue
+    #             fields = line.split(':')
+    #             name = fields[0]
+    #             uid = int(fields[2])
+    #             passwd_dict[uid] = name
+    #     return passwd_dict
