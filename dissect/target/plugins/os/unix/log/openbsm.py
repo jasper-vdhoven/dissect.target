@@ -752,7 +752,7 @@ class OpenBSMFile:
 
 
 class OpenBSMPlugin(Plugin):
-    AUDIT_PATH = ["/var/audit"]  # TODO: get path dynamically from /etc/security/audit_control config file
+    AUDIT_PATH = "/var/audit"  # TODO: get path dynamically from /etc/security/audit_control config file
     """
         There are three possible file names to match for:
         20211014091059.20211014112919 // where there two sets of 14 digits
@@ -765,7 +765,7 @@ class OpenBSMPlugin(Plugin):
         being written and has not yet been finished
     """
     # AUDIT_GLOBS = "*/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].{[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9],crash_recovery,not_terminated}"
-    AUDIT_GLOB = "*"
+    AUDIT_GLOB = "*.*"
     
     # Target here is the path to our evidence
     # def __init__(self, target: Target):
