@@ -22,25 +22,25 @@ aurecord_def = """
  */
 
 typedef struct au_tid32 {
- uint32_t	port;
- uint32_t	addr;
+    uint32_t    port;
+    uint32_t    addr;
 } au_tid32_t;
 
 typedef struct au_tid64 {
- uint64_t	port;
- uint32_t	addr;
+    uint64_t    port;
+    uint32_t    addr;
 } au_tid64_t;
 
 typedef struct au_tidaddr32 {
- uint32_t	port;
- uint32_t	type;
- uint32_t	addr[type / 4];
+    uint32_t    port;
+    uint32_t    type;
+    uint32_t    addr[type / 4];
 } au_tidaddr32_t;
 
 typedef struct au_tidaddr64 {
- uint64_t	port;
- uint32_t	type;
- uint32_t	addr[4];
+    uint64_t    port;
+    uint32_t    type;
+    uint32_t    addr[4];
 } au_tidaddr64_t;
 
 /*
@@ -50,21 +50,21 @@ typedef struct au_tidaddr64 {
  * text                    N bytes + 1 terminating NULL byte
  */
 typedef struct {
- uchar		 no;
- uint32_t	 val;
- uint16_t	 len;
- // changed type char *text to play nice with Dissect parsing
-    char         text[len-1];
-    char         nbt;
+    uchar       no;
+    uint32_t    val;
+    uint16_t    len;
+    // changed type char *text to play nice with Dissect parsing
+    char        text[len-1];
+    char        nbt;
 } au_arg32_t;
 
 typedef struct {
- uchar		 no;
- uint64_t	 val;
- uint16_t	 len;
- // changed type char *text to play nice with Dissect parsing
-    char         text[len-1];
-    char         nbt;
+    uchar       no;
+    uint64_t    val;
+    uint16_t    len;
+    // changed type char *text to play nice with Dissect parsing
+    char        text[len-1];
+    char        nbt;
 } au_arg64_t;
 
 /*
@@ -75,10 +75,10 @@ typedef struct {
  * text                    N bytes + 1 terminating NULL byte
  */
 typedef struct {
- uchar		no;
- uint8_t	uuid[16];
- uint16_t	len;
- char		*text;
+    uchar       no;
+    uint8_t     uuid[16];
+    uint16_t    len;
+    char        *text;
 } au_arg_uuid_t;
 
 /*
@@ -88,10 +88,10 @@ typedef struct {
  * data items              (depends on basic unit)
  */
 typedef struct {
- uchar	 howtopr;
- uchar	 bu;
- uchar	 uc;
- uchar	*data;
+ uchar      howtopr;
+ uchar      bu;
+ uchar      uc;
+ uchar      *data;
 } au_arb_t;
 
 /*
@@ -103,21 +103,21 @@ typedef struct {
  * device                  4 bytes/8 bytes (32-bit/64-bit)
  */
 typedef struct {
- uint32_t	mode;
- uint32_t	uid;
- uint32_t	gid;
- uint32_t	fsid;
- uint64_t	nid;
- uint32_t	dev;
+    uint32_t    mode;
+    uint32_t    uid;
+    uint32_t    gid;
+    uint32_t    fsid;
+    uint64_t    nid;
+    uint32_t    dev;
 } au_attr32_t;
 
 typedef struct {
- uint32_t	mode;
- uint32_t	uid;
- uint32_t	gid;
- uint32_t	fsid;
- uint64_t	nid;
- uint64_t	dev;
+    uint32_t    mode;
+    uint32_t    uid;
+    uint32_t    gid;
+    uint32_t    fsid;
+    uint64_t    nid;
+    uint64_t    dev;
 } au_attr64_t;
 
 /*
@@ -125,9 +125,9 @@ typedef struct {
  * text                    count null-terminated string(s)
  */
 typedef struct {
- uint32_t	 count;
+    uint32_t    count;
     // type is changed from char *text[AUDIT_MAX_ARGS]; to play nice with Dissect parsing
- char		text[count][];
+    char        text[count][];
 } au_execarg_t;
 
 /*
@@ -135,9 +135,9 @@ typedef struct {
  * text                    count null-terminated string(s)
  */
 typedef struct {
- uint32_t	 count;
+    uint32_t    count;
     // type is changed from char *text[AUDIT_MAX_ENV]; to play nice with Dissect parsing
- char		text[count][];
+    char		text[count][];
 } au_execenv_t;
 
 /*
@@ -145,8 +145,8 @@ typedef struct {
  * return value            4 bytes
  */
 typedef struct {
- uint32_t	status;
- uint32_t	ret;
+    uint32_t    status;
+    uint32_t    ret;
 } au_exit_t;
 
 /*
@@ -156,10 +156,10 @@ typedef struct {
  * file pathname           N bytes + 1 terminating NULL byte
  */
 typedef struct {
- uint32_t	 s;
- uint32_t	 ms;
- uint16_t	 len;
- char		*name;
+    uint32_t    s;
+    uint32_t    ms;
+    uint16_t    len;
+    char        *name;
 } au_file_t;
 
 
@@ -168,9 +168,9 @@ typedef struct {
  * group list              N * 4 bytes
  */
 typedef struct {
- uint16_t	no;
+    uint16_t	no;
     // type is changed from u_int32_t list[AUDIT_MAX_GROUPS] to play nice with Dissect parsing
- uint32_t	list[no][];
+    uint32_t	list[no][];
 } au_groups_t;
 
 /*
@@ -182,12 +182,12 @@ typedef struct {
  * milliseconds of time    4 bytes/8 bytes (32-bit/64-bit value)
  */
 typedef struct {
- uint32_t	size;
- uchar		version;
- uint16_t	e_type;
- uint16_t	e_mod;
- uint32_t	s;
- uint32_t	ms;
+    uint32_t	size;
+    uchar		version;
+    uint16_t	e_type;
+    uint16_t	e_mod;
+    uint32_t	s;
+    uint32_t	ms;
 } au_header32_t;
 
 /*
@@ -201,41 +201,41 @@ typedef struct {
  * nanoseconds of time     4 bytes/8 bytes  (32/64-bits)
  */
 typedef struct {
- uint32_t	size;
- uchar		version;
- uint16_t	e_type;
- uint16_t	e_mod;
- uint32_t	ad_type;
- uint32_t	addr[4];
- uint32_t	s;
- uint32_t	ms;
+    uint32_t	size;
+    uchar		version;
+    uint16_t	e_type;
+    uint16_t	e_mod;
+    uint32_t	ad_type;
+    uint32_t	addr[4];
+    uint32_t	s;
+    uint32_t	ms;
 } au_header32_ex_t;
 
 typedef struct {
- uint32_t	size;
- uchar		version;
- uint16_t	e_type;
- uint16_t	e_mod;
- uint64_t	s;
- uint64_t	ms;
+    uint32_t	size;
+    uchar		version;
+    uint16_t	e_type;
+    uint16_t	e_mod;
+    uint64_t	s;
+    uint64_t	ms;
 } au_header64_t;
 
 typedef struct {
- uint32_t	size;
- uchar		version;
- uint16_t	e_type;
- uint16_t	e_mod;
- uint32_t	ad_type;
- uint32_t	addr[4];
- uint64_t	s;
- uint64_t	ms;
+    uint32_t	size;
+    uchar		version;
+    uint16_t	e_type;
+    uint16_t	e_mod;
+    uint32_t	ad_type;
+    uint32_t	addr[4];
+    uint64_t	s;
+    uint64_t	ms;
 } au_header64_ex_t;
 
 /*
  * internet address        4 bytes
  */
 typedef struct {
- uint32_t	addr;
+    uint32_t    addr;
 } au_inaddr_t;
 
 /*
@@ -243,8 +243,8 @@ typedef struct {
  * internet address        16 bytes
  */
 typedef struct {
- uint32_t	type;
- uint32_t	addr[4];
+    uint32_t	type;
+    uint32_t	addr[4];
 } au_inaddr_ex_t;
 
 /*
@@ -260,26 +260,26 @@ typedef struct {
  * destination address     4 bytes
  */
 typedef struct {
- uchar		version;
- uchar		tos;
- uint16_t	len;
- uint16_t	id;
- uint16_t	offset;
- uchar		ttl;
- uchar		prot;
- uint16_t	chksm;
- uint32_t	src;
- uint32_t	dest;
-} auip_t;
+    uchar		version;
+    uchar		tos;
+    uint16_t	len;
+    uint16_t	id;
+    uint16_t	offset;
+    uchar		ttl;
+    uchar		prot;
+    uint16_t	chksm;
+    uint32_t	src;
+    uint32_t	dest;
+} au_ip_t;
 
 /*
  * object ID type          1 byte
  * object ID               4 bytes
  */
 typedef struct {
- uchar		type;
- uint32_t	id;
-} auipc_t;
+    uchar		type;
+    uint32_t	id;
+} au_ipc_t;
 
 /*
  * owner user ID           4 bytes
@@ -291,29 +291,29 @@ typedef struct {
  * key                     4 bytes
  */
 typedef struct {
- uint32_t	uid;
- uint32_t	gid;
- uint32_t	puid;
- uint32_t	pgid;
- uint32_t	mode;
- uint32_t	seq;
- uint32_t	key;
-} auipcperm_t;
+    uint32_t	uid;
+    uint32_t	gid;
+    uint32_t	puid;
+    uint32_t	pgid;
+    uint32_t	mode;
+    uint32_t	seq;
+    uint32_t	key;
+} au_ipcperm_t;
 
 /*
  * port IP address         2 bytes
  */
 typedef struct {
- uint16_t	port;
-} auiport_t;
+    uint16_t	port;
+} au_iport_t;
 
 /*
  * length		2 bytes
  * data			length bytes
  */
 typedef struct {
- uint16_t	 size;
- // changed type from char *data to play nice with Dissect parsing
+    uint16_t	 size;
+    // changed type from char *data to play nice with Dissect parsing
     char         data[size-1];
     char         nbt;
 } au_opaque_t;
@@ -323,8 +323,8 @@ typedef struct {
  * path                    N bytes + 1 terminating NULL byte
  */
 typedef struct {
- uint16_t	 len;
- // changed type char *path to play nice with Dissect parsing
+    uint16_t	 len;
+    // changed type char *path to play nice with Dissect parsing
     char         path[len-1];
     char         nbt;
 } au_path_t;
@@ -342,29 +342,29 @@ typedef struct {
  * machine address       4 bytes
  */
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- // commented out to aid printing struct au_tid32_t tid;
+    uint32_t	auid;
+    uint32_t	euid;
+    uint32_t	egid;
+    uint32_t	ruid;
+    uint32_t	rgid;
+    uint32_t	pid;
+    uint32_t	sid;
+    // commented out to aid printing struct au_tid32_t tid;
     uint32_t	tid_port;
- uint32_t	tid_addr;
+    uint32_t	tid_addr;
 } au_proc32_t;
 
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- // commented out to aid printing struct au_tid64_t tid;
+    uint32_t	auid;
+    uint32_t	euid;
+    uint32_t	egid;
+    uint32_t	ruid;
+    uint32_t	rgid;
+    uint32_t	pid;
+    uint32_t	sid;
+    // commented out to aid printing struct au_tid64_t tid;
     uint64_t	tid_port;
- uint32_t	tid_addr;
+    uint32_t	tid_addr;
 } au_proc64_t;
 
 /*
@@ -381,25 +381,25 @@ typedef struct {
  * machine address       16 bytes
  */
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- au_tidaddr32_t	tid;
+    uint32_t	    auid;
+    uint32_t	    euid;
+    uint32_t	    egid;
+    uint32_t	    ruid;
+    uint32_t	    rgid;
+    uint32_t	    pid;
+    uint32_t	    sid;
+    au_tidaddr32_t	tid;
 } au_proc32ex_t;
 
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- au_tidaddr64_t	tid;
+    uint32_t        auid;
+    uint32_t        euid;
+    uint32_t        egid;
+    uint32_t        ruid;
+    uint32_t        rgid;
+    uint32_t        pid;
+    uint32_t        sid;
+    au_tidaddr64_t	tid;
 } au_proc64ex_t;
 
 /*
@@ -407,13 +407,13 @@ typedef struct {
  * return value            4 bytes/8 bytes (32-bit/64-bit value)
  */
 typedef struct {
- uchar		status;
- uint32_t	ret;
+    uchar		status;
+    uint32_t	ret;
 } au_ret32_t;
 
 typedef struct {
- uchar		err;
- uint64_t	val;
+    uchar		err;
+    uint64_t	val;
 } au_ret64_t;
 
 /*
@@ -424,17 +424,17 @@ typedef struct {
  * text                    N bytes + 1 terminating NULL byte
  */
 typedef struct {
- uchar		 no;
- uint8_t	 uuid[16];
- uint16_t	 len;
- char		*text;
+    uchar		no;
+    uint8_t	    uuid[16];
+    uint16_t	len;
+    char		*text;
 } au_ret_uuid_t;
 
 /*
  * sequence number         4 bytes
  */
 typedef struct {
- uint32_t	seqno;
+    uint32_t	seqno;
 } au_seq_t;
 
 /*
@@ -445,11 +445,11 @@ typedef struct {
  * remote Internet address 4 bytes
  */
 typedef struct {
- uint16_t	type;
- uint16_t	l_port;
- uint32_t	l_addr;
- uint16_t	r_port;
- uint32_t	r_addr;
+    uint16_t	type;
+    uint16_t	l_port;
+    uint32_t	l_addr;
+    uint16_t	r_port;
+    uint32_t	r_addr;
 } au_socket_t;
 
 // OpenBSM source code lists wrong comment
@@ -464,14 +464,14 @@ typedef struct {
  * remote address	4 bytes/16 bytes (IPv4/IPv6 address)
  */
 typedef struct {
- uint16_t	domain;
- uint16_t	type;
- uint16_t	atype;
- uint16_t	l_port;
- uint8_t	    l_addr[atype];
- uint16_t	r_port;
- uint8_t	    r_addr[atype];
-} au_socket_ex32_t;
+    uint16_t	domain;
+    uint16_t	type;
+    uint16_t	atype;
+    uint16_t	l_port;
+    uint8_t	    l_addr[atype];
+    uint16_t	r_port;
+    uint8_t	    r_addr[atype];
+} au_socket_ex_t;
 
 /*
  * socket family           2 bytes
@@ -479,15 +479,15 @@ typedef struct {
  * socket address          4 bytes/16 bytes (IPv4/IPv6 address)
  */
 typedef struct {
- uint16_t	family;
- uint16_t	port;
- uint32_t	addr[4];
+    uint16_t	family;
+    uint16_t	port;
+    uint32_t	addr[4];
 } au_socketinet_ex32_t;
 
 typedef struct {
- uint16_t	family;
- uint16_t	port;
- uint32_t	addr;
+    uint16_t	family;
+    uint16_t	port;
+    uint32_t	addr;
 } au_socketinet32_t;
 
 /*
@@ -495,8 +495,8 @@ typedef struct {
  * path                    104 bytes
  */
 typedef struct {
- uint16_t	family;
- char		path[104];
+    uint16_t	family;
+    char		path[104];
 } au_socketunix_t;
 
 /*
@@ -512,29 +512,29 @@ typedef struct {
  * 	machine address       4 bytes
  */
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- // commented out to aid displaying struct au_tid32_t tid;
+    uint32_t	auid;
+    uint32_t	euid;
+    uint32_t	egid;
+    uint32_t	ruid;
+    uint32_t	rgid;
+    uint32_t	pid;
+    uint32_t	sid;
+    // commented out to aid displaying struct au_tid32_t tid;
     uint32_t	tid_port;
- uint32_t	tid_addr;
+    uint32_t	tid_addr;
 } au_subject32_t;
 
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- // commented out to aid printing struct au_tid64_t tid;
+    uint32_t	auid;
+    uint32_t	euid;
+    uint32_t	egid;
+    uint32_t	ruid;
+    uint32_t	rgid;
+    uint32_t	pid;
+    uint32_t	sid;
+    // commented out to aid printing struct au_tid64_t tid;
     uint64_t	tid_port;
- uint32_t	tid_addr;
+    uint32_t	tid_addr;
 } au_subject64_t;
 
 /*
@@ -551,31 +551,31 @@ typedef struct {
  * machine address       16 bytes
  */
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- // commented out to aid printing struct au_tidaddr32_t tid;
+    uint32_t	auid;
+    uint32_t	euid;
+    uint32_t	egid;
+    uint32_t	ruid;
+    uint32_t	rgid;
+    uint32_t	pid;
+    uint32_t	sid;
+    // commented out to aid printing struct au_tidaddr32_t tid;
     uint32_t	port;
     uint32_t	type;
     uint32_t	addr[type / 4];
 } au_subject32ex_t;
 
 typedef struct {
- uint32_t	auid;
- uint32_t	euid;
- uint32_t	egid;
- uint32_t	ruid;
- uint32_t	rgid;
- uint32_t	pid;
- uint32_t	sid;
- // commented out to aid printing struct au_tidaddr64_t tid;
- uint64_t	port;
- uint32_t	type;
- uint32_t	addr[4];
+    uint32_t	auid;
+    uint32_t	euid;
+    uint32_t	egid;
+    uint32_t	ruid;
+    uint32_t	rgid;
+    uint32_t	pid;
+    uint32_t	sid;
+    // commented out to aid printing struct au_tidaddr64_t tid;
+    uint64_t	port;
+    uint32_t	type;
+    uint32_t	addr[4];
 } au_subject64ex_t;
 
 /*
@@ -583,10 +583,10 @@ typedef struct {
  * text                    N bytes + 1 terminating NULL byte
  */
 typedef struct {
- uint16_t	 len;
- // changed type from char *text to play nice with dissect parsing
- char		    text[len-1];
- char      nbt;
+    uint16_t    len;
+    // changed type from char *text to play nice with dissect parsing
+    char        text[len-1];
+    char        nbt;
 } au_text_t;
 
 /*
@@ -595,11 +595,11 @@ typedef struct {
  * privstr              N bytes + 1 (0x00 byte)
 */
 typedef struct {
- uint8_t      sorf;
- uint16_t	    privstrlen;
- // changed type char *priv to play nice with Dissect parsing
- char         priv[privstrlen-1];
- char         nbt;
+    uint8_t     sorf;
+    uint16_t    privstrlen;
+    // changed type char *priv to play nice with Dissect parsing
+    char        priv[privstrlen-1];
+    char        nbt;
 } au_priv_t;
 
 /*
@@ -610,10 +610,10 @@ typedef struct {
 * privstr		N Bytes + 1
 */
 typedef struct {
- uint16_t	 privtstrlen;
- char		*privtstr;
- uint16_t	 privstrlen;
- char		*privstr;
+    uint16_t	privtstrlen;
+    char        *privtstr;
+    uint16_t	privstrlen;
+    char		*privstr;
 } au_privset_t;
 
 /*
@@ -621,25 +621,25 @@ typedef struct {
  * zonename text	N bytes + 1 NULL terminator
  */
 typedef struct {
- uint16_t	  len;
- // changed type char *zonename to play nice with Dissect parsing
- char       zonename[len-1];
- char       nbt;
+    uint16_t    len;
+    // changed type char *zonename to play nice with Dissect parsing
+    char        zonename[len-1];
+    char        nbt;
 } au_zonename_t;
 
 typedef struct {
- uint32_t	ident;
- uint16_t	filter;
- uint16_t	flags;
- uint32_t	fflags;
- uint32_t	data;
+    uint32_t	ident;
+    uint16_t	filter;
+    uint16_t	flags;
+    uint32_t	fflags;
+    uint32_t	data;
 } au_kevent_t;
 
 typedef struct {
- uint16_t   length;
- // changed type char *data to play nice with Dissect parsing
- char       data[length-1];
- char       nbt;
+    uint16_t   length;
+    // changed type char *data to play nice with Dissect parsing
+    char       data[length-1];
+    char       nbt;
 } auinvalid_t;
 
 /*
@@ -647,16 +647,18 @@ typedef struct {
  * record byte count       4 bytes
  */
 typedef struct {
- uint16_t	magic;
- uint32_t	count;
+    uint16_t	magic;
+    uint32_t	count;
 } au_trailer_t;
 
-// special struct that is used to parse local Unix sockets
-// struct matches AUT_SOCKET // 0x82
+/*
+ * socket family           2 bytes
+ * path                    (up to) 104 bytes + NULL  (NULL terminated string)
+ */
 typedef struct {
- ushort      family;
- char        addr[];
-} au_unixsock_t_special;
+    ushort      family;
+    char        path[];
+} au_unixsock_t;
 
 // macOS specific struct pulled from darwin-xnu source code at:
 // https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/security/audit/audit_private.h#L206
@@ -672,17 +674,17 @@ typedef struct {
  * cdhash               n bytes
  */
 struct au_identity_info {
- uint32_t        signer_type;
- short           signer_id_length;
- char            signing_id[signer_id_length-1];
- char            nbt;
- uchar           signing_id_trunc;
- short           team_id_length;
- char            team_id[team_id_length-1];
- char            nbt;
- uchar           team_id_trunc;
- short           cdhash_length;
- char            cdhash[cdhash_length];
+    uint32_t        signer_type;
+    short           signer_id_length;
+    char            signing_id[signer_id_length-1];
+    char            nbt;
+    uchar           signing_id_trunc;
+    short           team_id_length;
+    char            team_id[team_id_length-1];
+    char            nbt;
+    uchar           team_id_trunc;
+    short           cdhash_length;
+    char            cdhash[cdhash_length];
 };
 
 // Struct def pulled from: https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/security/audit/audit_bsm_token.c#L921
@@ -692,9 +694,9 @@ struct au_identity_info {
  * socket address          16 bytes
  */
 typedef struct {
- short           socket_family;
- ushort          l_port;
- uint8_t         addr[16];
+    short           socket_family;
+    ushort          l_port;
+    uint8_t         addr[16];
 } au_socketinet128_t;
 
 // Struct def pulled from: https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/security/audit/audit_bsm_token.c#L229
@@ -702,7 +704,7 @@ typedef struct {
  * how to print            1 byte
  * basic unit              1 byte
  * unit count              1 byte
- * data items              (depends on basic unit)
+ * data items headerheader             (depends on basic unit)
  */
 typedef struct {
     uint8_t         htprint;
