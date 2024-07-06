@@ -809,80 +809,20 @@ class OpenBSM:
                 while bytes_read < reclen:
                     match buf[bytes_read]:
 
-def fetch_and_check_header(fh):
-    header_magic = fh.read(1)
-    match header_magic:
-        case b"\x14":
-            # Get the size of the record we are reading
-            recsize: int = aurecord.uint32(fh)
-            full_rec = fh.read(recsize - 5)
-            # repack the 4 bytes as BE and add the remaining bytes
-            buf: bytes = header_magic + p32(recsize, "big") + full_rec
-            return recsize, buf
-        case b"":
-            print("[!] EOF reached!")
-            # fh.close()
-        case _:
-            print("[!] Invalid record")
-            hexdump(fh.read(10))
-            # fh.close()
-            raise Exception
-
-
-class OpenBSMPlugin(Plugin):
-    AUDIT_PATH = "/var/audit"  # TODO: get path dynamically from /etc/security/audit_control config file
-    """
-        There are three possible file names to match for:
-        20211014091059.20211014112919 // where there two sets of 14 digits
-        indicating the begin and end times of that audit trail
-
-        20230224222146.crash_recovery // where the audit trail is continue
-        after the system has returned from sleep (macOS mostly)
-
-        20230224222146.not_terminated // the audit trail to which is currently
-        being written and has not yet been finished
-    """
-    # AUDIT_GLOBS = "*/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].{[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9],crash_recovery,not_terminated}"
-    AUDIT_GLOB = "*.*"
-    
-    # Target here is the path to our evidence
-    # def __init__(self, target: Target):
-    #     super().__init__(target)
-    #     self.audit_paths = []
-
-    #     for _path in self.AUDIT_PATH:
-    #         print(f"[i] - {_path}")
-    #         self.audit_paths.extend(self.target.fs.path(_path).glob(self.AUDIT_GLOB))
-
-    def check_compatible(self) -> None:
-        print("[i] Made it to compat check")
-        if not self.target.fs.path(self.AUDIT_PATH).exists():
-            raise UnsupportedPluginError("No OpenBSM log files found")
-
-    @export(record=OpenBSMRecord)
-    def openbsm(self) -> OpenBSMRecord:
-        print("[i] Made it to openbsm() function")
-        """Return the contents of OpenBSM Audit Trail log files.
-        """
-        for file in self.target.fs.path(self.AUDIT_PATH).glob(self.AUDIT_GLOB):
-            print(f"[i] Currently reading: {file}")
-            fh = file.open()
-
-            openbsm_log = OpenBSMFile(fh)
-
-            for entry in openbsm_log:
-                print(f"\t{entry}")
-                print(f"{type(entry)}")
-                yield OpenBSMRecord
-
-    # def uid_to_name(fh):
-    #     passwd_dict = {}
-    #     with open(fh, "r+") as f:
-    #         for line in f:
-    #             if line.startswith('#'):
-    #                 continue
-    #             fields = line.split(':')
-    #             name = fields[0]
-    #             uid = int(fields[2])
-    #             passwd_dict[uid] = name
-    #     return passwd_dict
+    def _fetch_check_header(self):
+        header_magic = self.fh.read(1)
+        match header_magic:
+            case b"\x14":
+                self.target.info("Valid magic; parsing record length")
+                # Get the size for the record
+                recsize: int = c_aurecord.uint32(self.fh)
+                full_rec = self.fh.read(recsize - 5)
+                # repack the starting 4 bytes as BE and add remaining bytes
+                buf: bytes = header_magic + p32(recsize, "big") + full_rec
+                return recsize, buf
+            case b"":
+                self.target.info("EOF reached")
+                return 0, 0
+            case _:
+                self.target.error(f"Invalid record: {hexdump(self.fh.read(10))}")
+                raise Exception
