@@ -1,18 +1,16 @@
-from dissect.cstruct import cstruct, dumpstruct, Instance
-from dissect.cstruct.utils import pack, p8 ,p32, hexdump
+from typing import Any, Optional, Generator, BinaryIO, Iterator
 from enum import Enum
-import os.path
+import logging
+import os
 
-from typing import Iterator, BinaryIO, Callable
-from dissect.util import ts
-from flow.record.fieldtypes import path
+from flow.record import Record
+from dissect.cstruct import cstruct
+from dissect.cstruct.utils import p32, hexdump
+from dissect.target import plugin
+from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.exceptions import UnsupportedPluginError, FilesystemError
 
-from dissect.target import Target
-from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
-
-aurecord_def = """
+c_aurecord_def = """
 /*
  * Structs pulled from https://github.com/openbsm/openbsm/blob/54a0c07cf8bac71554130e8f6760ca68e5f36c7f/bsm/libbsm.h
  * Types changed from u_int8_t / u_int16_t / u_int32_t -> uint8_t / uint16_t / uint32_t / etc to match types with Dissect.cstruct
@@ -712,6 +710,10 @@ typedef struct {
 } au_data_t;
 """
 
+c_aurecord = cstruct(endian=">")
+c_aurecord.load(c_aurecord_def, compiled=True)
+
+
 class RecordMagic(Enum):
     AU_INVALID_T = 00
     AU_TRAILER_T = 19
@@ -754,6 +756,7 @@ class RecordMagic(Enum):
     AU_SOCKETINET128_T = 129
     AU_UNIXSOCK_T = 130
     AU_IDENTITY_INFO = 237
+
 
 # TODO: add Solaris parsing support
 
