@@ -672,11 +672,11 @@ struct au_identity_info {
     uint32_t        signer_type;
     short           signer_id_length;
     char            signing_id[signer_id_length-1];
-    char            nbt;
+    char            nbt_1;
     uchar           signing_id_trunc;
     short           team_id_length;
     char            team_id[team_id_length-1];
-    char            nbt;
+    char            nbt_2;
     uchar           team_id_trunc;
     short           cdhash_length;
     char            cdhash[cdhash_length];
