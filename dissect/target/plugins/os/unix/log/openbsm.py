@@ -791,6 +791,7 @@ class OpenBSMPlugin(plugin.Plugin):
             for event in OpenBSM(entry_data):
                 self.target.log.info(f"Event: {event}")
 
+
 class OpenBSM:
     def __init__(self, fh: BinaryIO) -> None:
         fh.seek(0)
@@ -808,6 +809,201 @@ class OpenBSM:
                 # print(f"[i] current byte: {buf[bytes_read]}")
                 while bytes_read < reclen:
                     match buf[bytes_read]:
+                        case RecordMagic.AU_TRAILER_T.value:
+                            trailer_t = c_aurecord.au_trailer_t(buf[bytes_read + 1 :])
+                            # sizeof au_trailer_t + 1 extra byte to go to the next struct
+                            bytes_read += 6 + 1
+                            yield trailer_t
+                        case RecordMagic.AU_HEADER32_T.value:
+                            header32_t = c_aurecord.au_header32_t(buf[bytes_read + 1 :])
+                            # sizeof au_header32_t + 1 extra byte to go to the next struct
+                            bytes_read += 17 + 1
+                            yield header32_t
+                        case RecordMagic.AU_HEADER32_EX_T.value:
+                            header32ex_t = c_aurecord.au_header32_ex_t(buf[bytes_read + 1 :])
+                            bytes_read += (16 + 16 + 1 + 4) + 1
+                            yield header32ex_t
+                        case RecordMagic.AU_DATA_T.value:
+                            data_t = c_aurecord.au_data_t(buf[bytes_read + 1 :])
+                            bytes_read += 3 + data_t._sizes["data_items"] + 1
+                            yield data_t
+                        case RecordMagic.AU_IPC_T.value:
+                            ipc_t = c_aurecord.au_ipc_t(buf[bytes_read + 1 :])
+                            bytes_read += 5 + 1
+                            yield ipc_t
+                        case RecordMagic.AU_PATH_T.value:
+                            path_t = c_aurecord.au_path_t(buf[bytes_read + 1 :])
+                            # sizeof au_path_t + 1 extra byte to go to the next struct
+                            bytes_read += 2 + path_t.len + 1
+                            yield path_t
+                        case RecordMagic.AU_SUBJECT32_T.value:
+                            subject32_t = c_aurecord.au_subject32_t(buf[bytes_read + 1 :])
+                            # sizeof au_subject32_t + 1 extra byte to go to the next struct
+                            bytes_read += 36 + 1
+                            yield subject32_t
+                        case RecordMagic.AU_PROC32_T.value:
+                            proc32_t = c_aurecord.au_proc32_t(buf[bytes_read + 1 :])
+                            bytes_read += 36 + 1
+                            yield proc32_t
+                        case RecordMagic.AU_RET32_T.value:
+                            ret32_t = c_aurecord.au_ret32_t(buf[bytes_read + 1 :])
+                            # sizeof au_ret32_t + 1 extra byte to go to the next struct
+                            bytes_read += 5 + 1
+                            yield ret32_t
+                        case RecordMagic.AU_TEXT_T.value:
+                            text_t = c_aurecord.au_text_t(buf[bytes_read + 1 :])
+                            # sizeof au_text_t + 1 extra byte to go to the next struct
+                            bytes_read += text_t.len + 2 + 1
+                            yield text_t
+                        case RecordMagic.AU_OPAQUE_T.value:
+                            opaque_t = c_aurecord.au_opaque_t(buf[bytes_read + 1 :])
+                            bytes_read += 3 + opaque_t._sizes["data_items"] + 1
+                            yield opaque_t
+                        case RecordMagic.AU_INADDR_T.value:
+                            inaddr_t = c_aurecord.au_inaddr_t(buf[bytes_read + 1 :])
+                            bytes_read += 4 + 1
+                            yield inaddr_t
+                        case RecordMagic.AU_IP_T.value:
+                            ip_t = c_aurecord.au_ip_t(buf[bytes_read + 1 :])
+                            bytes_read += (4 + 8 + 8) + 1
+                            yield ip_t
+                        case RecordMagic.AU_IPORT_T.value:
+                            iport_t = c_aurecord.au_iport_t(buf[bytes_read + 1 :])
+                            bytes_read += 2 + 1
+                            yield iport_t
+                        case RecordMagic.AU_ARG32_T.value:
+                            arg32_t = c_aurecord.au_arg32_t(buf[bytes_read + 1 :])
+                            # sizeof au_arg32_t + 1 extra byte to go to the next struct
+                            bytes_read += arg32_t.len + 7 + 1
+                            yield arg32_t
+                        case RecordMagic.AU_SOCKET_T.value:
+                            socket_t = c_aurecord.au_socket_t(buf[bytes_read + 1 :])
+                            bytes_read += (6 + 8) + 1
+                            yield socket_t
+                        case RecordMagic.AU_SEQ_T.value:
+                            seq_t = c_aurecord.au_seq_t(buf[bytes_read + 1 :])
+                            bytes_read += 4 + 1
+                            yield seq_t
+                        case RecordMagic.AU_IPCPERM_T.value:
+                            ipcperm_t = c_aurecord.au_ipcperm_t(buf[bytes_read + 1 :])
+                            bytes_read += 28 + 1
+                            yield ipcperm_t
+                        case RecordMagic.AU_EXECARG_T.value:
+                            execarg_t = c_aurecord.au_execarg_t(buf[bytes_read + 1 :])
+                            """
+                                Since we don't know the exact length, iterate over all seperate arguments
+                                and add their size to the total count
+                            """
+                            length = 0
+                            for items in execarg_t.text:
+                                length += len(items) + 1
+                            length += 4 + 1
+                            bytes_read += length
+                            yield execarg_t
+                        case RecordMagic.AU_EXECENV_T.value:
+                            execenv_t = c_aurecord.au_execenv_t(buf[bytes_read + 1 :])
+                            length = 0
+                            for items in execenv_t.text:
+                                length += len(items) + 1
+                            length += 4 + 1
+                            bytes_read += length
+                            yield execenv_t
+                        case RecordMagic.AU_ATTR32_t.value:
+                            attr32_t = c_aurecord.au_attr32_t(buf[bytes_read + 1 :])
+                            # sizeof au_attr32_t + 1 extra byte to go to the next struct
+                            bytes_read += 28 + 1
+                            yield attr32_t
+                        case RecordMagic.AU_EXIT_T.value:
+                            exit_t = c_aurecord.au_exit_t(buf[bytes_read + 1 :])
+                            bytes_read += 8 + 1
+                            yield exit_t
+                        case RecordMagic.AU_ARG64_T.value:
+                            arg64_t = c_aurecord.au_arg64_t(buf[bytes_read + 1 :])
+                            bytes_read += (1 + 8 + 2) + arg64_t.len + 1
+                            yield arg64_t
+                        case RecordMagic.AU_RET64_t.value:
+                            ret64_t = c_aurecord.au_ret64_t(buf[bytes_read + 1 :])
+                            bytes_read += 9 + 1
+                            yield ret64_t
+                        case RecordMagic.AU_ATTR64_T.value:
+                            attr64_t = c_aurecord.au_attr64_t(buf[bytes_read + 1 :])
+                            bytes_read += 32 + 1
+                            yield attr64_t
+                        case RecordMagic.AU_HEADER64_T.value:
+                            header64_t = c_aurecord.au_header64_t(buf[bytes_read + 1 :])
+                            bytes_read += 25 + 1
+                            yield header64_t
+                        case RecordMagic.AU_SUBJECT64_T.value:
+                            subject64_t = c_aurecord.au_subject64_t(buf[bytes_read + 1 :])
+                            bytes_read += 28 + 12 + 1
+                            yield subject64_t
+                        case RecordMagic.AU_PROCESS64_T.value:
+                            proc64_t = c_aurecord.au_proc64_t(buf[bytes_read + 1 :])
+                            bytes_read += 28 + 12 + 1
+                            yield proc64_t
+                        case RecordMagic.AU_HEADER64_EXT_T.value:
+                            header64_ex_t = c_aurecord.au_header64_ex_t(buf[bytes_read + 1 :])
+                            bytes_read += 12 + 4 + 1 + 16 + 1
+                            yield header64_ex_t
+                        case RecordMagic.AU_SUBJECT32EX_T.value:
+                            subject32ex_t = c_aurecord.au_subject32ex_t(buf[bytes_read + 1 :])
+                            # sizeof au_subject32ex_t + 1 extra byte to go to the next struct
+                            bytes_read += 40 + 1
+                            yield subject32ex_t
+                        case RecordMagic.AU_PROC32EX_T.value:
+                            proc32ex_t = c_aurecord.au_proc32ex_t(buf[bytes_read + 1 :])
+                            bytes_read += (28 + 12) + 1
+                            yield proc32ex_t
+                        case RecordMagic.AU_SUBJECT64EX_T.value:
+                            subject64ex_t = c_aurecord.au_subject64ex_t(buf[bytes_read + 1 :])
+                            bytes_read += 28 + 12 + 16 + 1
+                            yield subject64ex_t
+                        case RecordMagic.AU_PROCESS64EX_T.value:
+                            process64ex_t = c_aurecord.au_proc64ex_t(buf[bytes_read + 1 :])
+                            bytes_read += 28 + 12 + 16 + 1
+                            yield process64ex_t
+                        case RecordMagic.AU_INADDR_EX_T.value:
+                            inaddr_ex_t = c_aurecord.au_inaddr_ex_t(buf[bytes_read + 1 :])
+                            bytes_read += 20 + 1
+                            yield inaddr_ex_t
+                        case RecordMagic.AU_SOCKETEX32_T.value:
+                            socketex_t = c_aurecord.au_socket_ex_t(buf[bytes_read + 1 :])
+                            length = socketex_t.atype * 2
+                            bytes_read += (10 + length) + 1
+                            yield socketex_t
+                        case RecordMagic.AU_SOCKETINET32_T.value:
+                            socketinet32_t = c_aurecord.au_socketinet32_t(buf[bytes_read + 1 :])
+                            bytes_read += 8 + 1
+                            yield socketinet32_t
+                        case RecordMagic.AU_SOCKETINET128_T.value:
+                            socketinet128_t = c_aurecord.au_socketinet128_t(buf[bytes_read + 1 :])
+                            bytes_read += 20 + 1
+                            yield socketinet128_t
+                        case RecordMagic.AU_UNIXSOCK_T.value:
+                            unixsock_t = c_aurecord.au_unixsock_t(buf[bytes_read + 1 :])
+                            # TODO: Find a way to dynamically calculate the size of this record
+                            bytes_read += (2 + unixsock_t._sizes["path"]) + 1
+                            yield unixsock_t
+                        case RecordMagic.AU_IDENTITY_INFO.value:
+                            identity_info = c_aurecord.au_identity_info(buf[bytes_read + 1 :])
+                            length = (
+                                identity_info.signer_id_length
+                                + identity_info.team_id_length
+                                + identity_info.cdhash_length
+                            )
+                            bytes_read += (4 + 2 + 2 + 2 + 2) + length + 1
+                            yield identity_info
+                        case RecordMagic.AU_INVALID_T.value:
+                            invalid_t = c_aurecord.au_invalid_t(buf[bytes_read + 1 :])
+                            bytes_read += 2 + invalid_t.len + 1
+                            yield invalid_t
+                        case _:
+                            print(hexdump(buf))
+                            print(f"[i] First byte of buf: {buf[bytes_read]}")
+                            print(f"[i] Type of buf:       {type(buf[bytes_read])}")
+                            break
+        except EOFError:
+            self.target.info("EOF reached")
 
     def _fetch_check_header(self):
         header_magic = self.fh.read(1)
