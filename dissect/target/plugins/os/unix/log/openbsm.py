@@ -760,36 +760,36 @@ class RecordMagic(Enum):
 
 # TODO: add Solaris parsing support
 
-aurecord = cstruct(endian=">")
-aurecord.load(aurecord_def, compiled=True)
 
-OpenBSMRecord = TargetRecordDescriptor(
-    "bsd/log/openbsm",
-    [
-        ("datetime", "ts"),
-        # OpenBSM audit trail fields
-        ("string", "date"),
-        ("string", "msec"),
-        ("int", "port"),
-        ("int", "ip-address-type"),
-        ("int", "ip-address"),
+class OpenBSMPlugin(plugin.Plugin):
+    """Plugin for fetching and parsing OpenBSM audit trails"""
 
-    ]
-)
+    RECORD_NAME = "filesystem/unix/openbsm"
+    LOGS_DIR_PATH = "/var/audit"
+    GLOB = "*[!current]"  # current is a symlink to *.not_terminated
 
+    def __init__(self, target):
+        super().__init__(target)
 
-def get_optional(value: str, to_type: Callable):
-    """Return the value if True, otherwise return None."""
-    return to_type(value) if value else None
+    def check_compatible(self) -> None:
+        if not self.target.fs.path(self.LOGS_DIR_PATH).exists():
+            raise UnsupportedPluginError("No OpenBSM files found")
 
+    @plugin.export(record=DynamicDescriptor(["datetime"]))
+    def openbsm(self):
+        for entry in self.target.fs.path(self.LOGS_DIR_PATH).glob(self.GLOB):
+            if not entry.exists():
+                self.target.log.warning(f"Audit trail log file does not exist: {entry}")
 
-class OpenBSMFile:
-    """Parse OpenBSM audit trail file format
-    
-    References:
+            self.target.log.info(f"Going to parse file: {entry}")
+            try:
+                entry_data = entry.open()
+            except FilesystemError:
+                self.target.log.exception(f"Failed to open audit trail: {entry}")
+                continue
 
-    """
-    def __init__(self, fh: BinaryIO):
+            for event in OpenBSM(entry_data):
+                self.target.log.info(f"Event: {event}")
         fh.seek(0)
         self.fh = fh
 
