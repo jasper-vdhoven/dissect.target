@@ -3,7 +3,6 @@ from typing import Iterator
 
 from dissect.sql import sqlite3
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -57,6 +56,9 @@ class SophosPlugin(Plugin):
         """Return alert log records from Sophos Hitman Pro/Alert.
 
         Yields HitmanAlertRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Timestamp.
             alert (string): Type of Alert.
             description (string): Short description of the alert.
@@ -86,6 +88,9 @@ class SophosPlugin(Plugin):
         """Return log history records from Sophos Home.
 
         Yields SophosLogRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Timestamp.
             description (string): Short description of the alert.
             path (path): Path to the infected file (if available).
@@ -105,7 +110,7 @@ class SophosPlugin(Plugin):
                     yield SophosLogRecord(
                         ts=ts,
                         description=details.get("threat_name", details),
-                        path=path.from_windows(path_to_infected_file),
+                        path=self.target.fs.path(path_to_infected_file),
                         _target=self.target,
                     )
                 except Exception as error:

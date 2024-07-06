@@ -4,6 +4,8 @@ import inspect
 import json
 import os
 import sys
+import textwrap
+import urllib
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -12,11 +14,14 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
+from dissect.target.helpers.docs import get_docstring
 from dissect.target.helpers.targetd import CommandProxy
+from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
     PluginFunction,
+    find_plugin_functions,
     get_external_module_paths,
     load_modules_from_paths,
 )
@@ -261,3 +266,49 @@ def catch_sigpipe(func: Callable) -> Callable:
             raise
 
     return wrapper
+
+
+def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[str]:
+    """Converts argument-style ``-L`` to URI-style.
+
+    Turns:
+        ``target-query /evtxs/* -L log --log-hint="evtx" -f evtx``
+    into:
+        ``target-query "log:///evtxs/*?hint=evtx" -f evtx``
+
+    For loaders providing ``@arg()`` arguments.
+    """
+    loader = LOADERS_BY_SCHEME.get(loader_name, None)
+
+    parser = argparse.ArgumentParser(
+        argument_default=argparse.SUPPRESS, description="\n".join(textwrap.wrap(get_docstring(loader)))
+    )
+    for load_arg in getattr(loader, "__args__", []):
+        parser.add_argument(*load_arg[0], **load_arg[1])
+    args = vars(parser.parse_known_args(rest)[0])
+    uris = []
+    for target in targets:
+        uris.append(f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else ""))
+    return uris
+
+
+def find_and_filter_plugins(
+    target: Target, functions: str, excluded_func_paths: set[str] = None
+) -> Iterator[PluginFunction]:
+    # Keep a set of plugins that were already executed on the target.
+    executed_plugins = set()
+    excluded_func_paths = excluded_func_paths or set()
+
+    func_defs, _ = find_plugin_functions(target, functions, compatibility=False)
+
+    for func_def in func_defs:
+        if func_def.path in excluded_func_paths:
+            continue
+
+        # Avoid executing same plugin for multiple OSes (like hostname)
+        if func_def.name in executed_plugins:
+            continue
+
+        executed_plugins.add(func_def.name)
+
+        yield func_def

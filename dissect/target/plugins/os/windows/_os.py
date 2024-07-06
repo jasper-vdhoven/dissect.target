@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import operator
 import struct
 from typing import Any, Iterator, Optional
 
@@ -19,6 +20,11 @@ class WindowsPlugin(OSPlugin):
         # Just run this here for now
         self.add_mounts()
 
+        target.props["sysvol_drive"] = next(
+            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts.get("sysvol") and mnt != "sysvol"),
+            None,
+        )
+
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
@@ -32,17 +38,11 @@ class WindowsPlugin(OSPlugin):
         target.fs.case_sensitive = False
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
-        target.fs.mount("c:", sysvol)
 
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
-                if fs.exists("boot") and fs.exists("boot/BCD"):
+                if fs.exists("boot/BCD") or fs.exists("EFI/Microsoft/Boot/BCD"):
                     target.fs.mount("efi", fs)
-
-        if target.fs.exists("sysvol/windows"):
-            target.windir = target.fs.get("sysvol/windows")
-        else:
-            target.windir = target.fs.get("sysvol/winnt")
 
         return cls(target)
 
@@ -58,14 +58,12 @@ class WindowsPlugin(OSPlugin):
                     p = name.lower()[1:].split("\\")
                     if p[0] == "dosdevices":
                         drive = p[1]
-                        if drive == "c:":
-                            continue
 
                         if value.startswith(b"DMIO:ID:"):
                             guid = value[8:]
 
                             for volume in self.target.volumes:
-                                if volume.guid == guid:
+                                if volume.guid == guid and volume.fs:
                                     self.target.fs.mount(drive, volume.fs)
 
                         elif len(value) == 12:
@@ -77,7 +75,19 @@ class WindowsPlugin(OSPlugin):
                                             self.target.fs.mount(drive, volume.fs)
                                             break
         except Exception as e:
-            self.target.log.warning("Failed to map drive letters", exc_info=e)
+            self.target.log.warning("Failed to map drive letters")
+            self.target.log.debug("", exc_info=e)
+
+        sysvol_drive = self.target.fs.mounts.get("sysvol")
+        # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
+        if sysvol_drive and operator.countOf(self.target.fs.mounts.values(), sysvol_drive) == 1:
+            if "c:" not in self.target.fs.mounts:
+                self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
+                self.target.fs.mount("c:", sysvol_drive)
+            else:
+                self.target.log.warning("Unknown drive letter for sysvol")
+        else:
+            self.target.log.warning("No sysvol drive found")
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
@@ -237,13 +247,21 @@ class WindowsPlugin(OSPlugin):
         if any(map(lambda value: value is not None, version_parts.values())):
             version = []
 
-            prodcut_name = _part_str(version_parts, "ProductName")
-            version.append(prodcut_name)
-
             nt_version = _part_str(version_parts, "CurrentVersion")
+            build_version = _part_str(version_parts, "CurrentBuildNumber")
+            prodcut_name = _part_str(version_parts, "ProductName")
+
+            # CurrentBuildNumber >= 22000 on NT 10.0 indicates Windows 11.
+            # https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+            try:
+                if nt_version == "10.0" and int(build_version) >= 22_000:
+                    prodcut_name = prodcut_name.replace("Windows 10", "Windows 11")
+            except ValueError:
+                pass
+
+            version.append(prodcut_name)
             version.append(f"(NT {nt_version})")
 
-            build_version = _part_str(version_parts, "CurrentBuildNumber")
             ubr = version_parts["UBR"]
             if ubr:
                 build_version = f"{build_version}.{ubr}"

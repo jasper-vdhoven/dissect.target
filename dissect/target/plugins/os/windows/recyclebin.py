@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from typing import Generator
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -22,7 +23,7 @@ RecycleBinRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     ],
 )
 
-c_recyclebin_i = """
+recyclebin_def = """
 struct header_v1 {
     int64    version;
     int64    file_size;
@@ -38,14 +39,14 @@ struct header_v2 {
 };
 """
 
+c_recyclebin = cstruct().load(recyclebin_def)
+
 
 class RecyclebinPlugin(Plugin):
     """Recyclebin plugin."""
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-        self.recyclebin_parser = cstruct.cstruct()
-        self.recyclebin_parser.load(c_recyclebin_i)
 
     def check_compatible(self) -> None:
         for fs_entry in self.target.fs.path("/").iterdir():
@@ -67,6 +68,9 @@ class RecyclebinPlugin(Plugin):
         Return files located in the recycle bin ($Recycle.Bin).
 
         Yields RecycleBinRecords with fields:
+
+        .. code-block:: text
+
           hostname (string): The target hostname
           domain (string): The target domain
           ts (datetime): The time of deletion
@@ -115,10 +119,10 @@ class RecyclebinPlugin(Plugin):
 
         return RecycleBinRecord(
             ts=wintimestamp(entry.timestamp),
-            path=path.from_windows(entry.filename.rstrip("\x00")),
-            source=path.from_windows(source_path),
+            path=self.target.fs.path(entry.filename.rstrip("\x00")),
+            source=self.target.fs.path(source_path),
             filesize=entry.file_size,
-            deleted_path=path.from_windows(deleted_path),
+            deleted_path=self.target.fs.path(deleted_path),
             _target=self.target,
             _user=user,
         )
@@ -129,11 +133,11 @@ class RecyclebinPlugin(Plugin):
             return "unknown"
         return parent_path.name
 
-    def select_header(self, data: bytes) -> cstruct.Structure:
+    def select_header(self, data: bytes) -> c_recyclebin.header_v1 | c_recyclebin.header_v2:
         """Selects the correct header based on the version field in the header"""
 
-        header_version = self.recyclebin_parser.uint64(data[:8])
+        header_version = c_recyclebin.uint64(data[:8])
         if header_version == 2:
-            return self.recyclebin_parser.header_v2
+            return c_recyclebin.header_v2
         else:
-            return self.recyclebin_parser.header_v1
+            return c_recyclebin.header_v1

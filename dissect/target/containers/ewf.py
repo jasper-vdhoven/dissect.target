@@ -12,23 +12,22 @@ from dissect.target.container import Container
 class EwfContainer(Container):
     """Expert Witness Disk Image Format"""
 
+    __type__ = "ewf"
+
     def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
         fhs = [fh] if not isinstance(fh, list) else fh
         if hasattr(fhs[0], "read"):
             self.ewf = EWF(fhs)
         else:
-            self.ewf = EWF([path.open("rb") for path in find_files(fhs[0])])
+            self.ewf = EWF(find_files(fhs[0]))
 
         self._stream = self.ewf.open()
         super().__init__(fh, self.ewf.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         """Detect file header"""
-        magic = fh.read(3)
-        fh.seek(-3, io.SEEK_CUR)
-
-        return magic == b"EVF" or magic == b"LVF" or magic == b"LEF"
+        return fh.read(3) in (b"EVF", b"LVF", b"LEF")
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

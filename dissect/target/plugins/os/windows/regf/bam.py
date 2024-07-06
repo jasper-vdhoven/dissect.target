@@ -1,18 +1,16 @@
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_bamdef = """
+bam_def = """
     struct entry {
         uint64 ts;
     };
     """
-c_bam = cstruct()
-c_bam.load(c_bamdef)
+c_bam = cstruct().load(bam_def)
 
 BamDamRecord = TargetRecordDescriptor(
     "windows/registry/bam",
@@ -42,6 +40,9 @@ class BamDamPlugin(Plugin):
         """Parse bam and dam registry keys.
 
         Yields BamDamRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The parsed timestamp.
@@ -57,6 +58,6 @@ class BamDamPlugin(Plugin):
                         data = c_bam.entry(entry.value)
                         yield BamDamRecord(
                             ts=wintimestamp(data.ts),
-                            path=path.from_windows(entry.name),
+                            path=self.target.fs.path(entry.name),
                             _target=self.target,
                         )

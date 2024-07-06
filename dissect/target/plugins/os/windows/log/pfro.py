@@ -1,8 +1,6 @@
 import datetime
 import re
 
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -43,6 +41,9 @@ class PfroPlugin(Plugin):
             - https://community.ccleaner.com/topic/49106-pending-file-rename-operations-log/
 
         Yields PfroRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The parsed timestamp.
@@ -70,7 +71,7 @@ class PfroPlugin(Plugin):
 
                 yield PfroRecord(
                     ts=datetime.datetime.strptime(date, "%m/%d/%Y %H:%M:%S"),
-                    path=path.from_windows(file_path),
+                    path=self.target.fs.path(file_path),
                     operation=operation,
                     _target=self.target,
                 )

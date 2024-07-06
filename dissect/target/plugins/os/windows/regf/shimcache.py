@@ -6,7 +6,6 @@ from typing import Callable, Generator, Optional, Tuple, Union
 
 from dissect.cstruct import Structure, cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -22,7 +21,7 @@ ShimcacheRecord = TargetRecordDescriptor(
     ],
 )
 
-c_shimdef = """
+shim_def = """
 struct NT61_HEADER {
     uint32 magic;
     uint32 num_entries;
@@ -100,8 +99,7 @@ struct WIN10_ENTRY_DATA {
     uint64 ts;
 };
 """
-c_shim = cstruct()
-c_shim.load(c_shimdef)
+c_shim = cstruct().load(shim_def)
 
 MAGIC_NT61 = 0xBADC0FEE
 MAGIC_NT52 = 0xBADC0FFE
@@ -319,6 +317,9 @@ class ShimcachePlugin(Plugin):
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
 
         Yields ShimcacheRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             last_modified (datetime): The last modified date.
@@ -358,6 +359,6 @@ class ShimcachePlugin(Plugin):
                 last_modified=ts,
                 name=name,
                 index=index,
-                path=path.from_windows(self.target.resolve(file_path)),
+                path=self.target.resolve(file_path),
                 _target=self.target,
             )

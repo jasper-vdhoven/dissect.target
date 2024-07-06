@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import lzma
 from typing import BinaryIO, Callable, Iterator
 
 import zstandard
-from dissect.cstruct import Instance, cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 from dissect.util.compression import lz4
-from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -253,8 +254,7 @@ struct EntryArrayObject_Compact {
 };
 """  # noqa: E501
 
-c_journal = cstruct()
-c_journal.load(journal_def)
+c_journal = cstruct().load(journal_def)
 
 
 def get_optional(value: str, to_type: Callable):
@@ -315,7 +315,7 @@ class JournalFile:
 
         return key, value
 
-    def __iter__(self) -> Iterator[Instance]:
+    def __iter__(self) -> Iterator[dict[str, int | str]]:
         "Iterate over the entry objects to read payloads."
 
         for offset in self.entry_object_offsets():
@@ -394,6 +394,8 @@ class JournalPlugin(Plugin):
             - https://github.com/systemd/systemd/blob/9203abf79f1d05fdef9b039e7addf9fc5a27752d/man/systemd.journal-fields.xml
         """  # noqa: E501
 
+        path_function = self.target.fs.path
+
         for _path in self.journal_paths:
             fh = _path.open()
 
@@ -409,7 +411,7 @@ class JournalPlugin(Plugin):
                     message=entry.get("message"),
                     message_id=entry.get("message_id"),
                     priority=get_optional(entry.get("priority"), int),
-                    code_file=get_optional(entry.get("code_file"), path.from_posix),
+                    code_file=get_optional(entry.get("code_file"), path_function),
                     code_line=get_optional(entry.get("code_line"), int),
                     code_func=entry.get("code_func"),
                     errno=get_optional(entry.get("errno"), int),
@@ -427,12 +429,12 @@ class JournalPlugin(Plugin):
                     uid=get_optional(entry.get("uid"), int),
                     gid=get_optional(entry.get("gid"), int),
                     comm=entry.get("comm"),
-                    exe=get_optional(entry.get("exe"), path.from_posix),
+                    exe=get_optional(entry.get("exe"), path_function),
                     cmdline=entry.get("cmdline"),
                     cap_effective=entry.get("cap_effective"),
                     audit_session=get_optional(entry.get("audit_session"), int),
                     audit_loginuid=get_optional(entry.get("audit_loginuid"), int),
-                    systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path.from_posix),
+                    systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path_function),
                     systemd_slice=entry.get("systemd_slice"),
                     systemd_unit=entry.get("systemd_unit"),
                     systemd_user_unit=entry.get("systemd_user_unit"),
@@ -451,8 +453,8 @@ class JournalPlugin(Plugin):
                     kernel_device=entry.get("kernel_device"),
                     kernel_subsystem=entry.get("kernel_subsystem"),
                     udev_sysname=entry.get("udev_sysname"),
-                    udev_devnode=get_optional(entry.get("udev_devnode"), path.from_posix),
-                    udev_devlink=get_optional(entry.get("udev_devlink"), path.from_posix),
+                    udev_devnode=get_optional(entry.get("udev_devnode"), path_function),
+                    udev_devlink=get_optional(entry.get("udev_devlink"), path_function),
                     journal_hostname=entry.get("hostname"),
                     filepath=_path,
                     _target=self.target,

@@ -1,4 +1,0 @@
-Write-Host "Hello World!"
-Get-Service | Where-Object {$_.Status -eq "Running"}
-Get-ComputerInfo -Property "*version"
-exit

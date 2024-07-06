@@ -1,4 +1,4 @@
-from flow.record.fieldtypes import path
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -13,7 +13,7 @@ RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, Us
     [
         ("datetime", "ts"),
         ("wstring", "name"),
-        ("path", "path"),
+        ("command", "command"),
         ("string", "key"),
     ],
 )
@@ -50,7 +50,7 @@ class RunKeysPlugin(Plugin):
             raise UnsupportedPluginError("No registry run key found")
 
     @export(record=RunKeyRecord)
-    def runkeys(self):
+    def runkeys(self) -> Iterator[RunKeyRecord]:
         """Iterate various run key locations. See source for all locations.
 
         Run keys (Run and RunOnce) are registry keys that make a program run when a user logs on. a Run key runs every
@@ -61,11 +61,14 @@ class RunKeysPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
 
         Yields RunKeyRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The registry key last modified timestamp.
             name (string): The run key name.
-            path (string): The run key path.
+            command (command): The run key command.
             key (string): The source key for this run key.
         """
         for key in self.KEYS:
@@ -75,7 +78,7 @@ class RunKeysPlugin(Plugin):
                     yield RunKeyRecord(
                         ts=r.ts,
                         name=entry.name,
-                        path=path.from_windows(entry.value),
+                        command=entry.value,
                         key=key,
                         _target=self.target,
                         _key=r,

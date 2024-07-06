@@ -7,13 +7,14 @@ from dissect.target.exceptions import (
     FilesystemError,
     IsADirectoryError,
     NotADirectoryError,
+    NotASymlinkError,
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 
 class DirectoryFilesystem(Filesystem):
-    __fstype__ = "dir"
+    __type__ = "dir"
 
     def __init__(self, path: Path, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
@@ -55,14 +56,19 @@ class DirectoryFilesystem(Filesystem):
 
 
 class DirectoryFilesystemEntry(FilesystemEntry):
+    entry: Path
+
     def get(self, path: str) -> FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return self.fs.get(path)
 
     def open(self) -> BinaryIO:
-        if self.is_dir():
-            raise IsADirectoryError(self.path)
-        return self._resolve().entry.open("rb")
+        try:
+            if self.is_dir():
+                raise IsADirectoryError(self.path)
+            return self._resolve().entry.open("rb")
+        except (PermissionError, OSError) as e:
+            raise FilesystemError from e
 
     def iterdir(self) -> Iterator[str]:
         if not self.is_dir():
@@ -104,10 +110,23 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             return False
 
     def is_symlink(self) -> bool:
-        return self.entry.is_symlink()
+        try:
+            return self.entry.is_symlink()
+        except (FilesystemError, OSError):
+            return False
 
     def readlink(self) -> str:
-        return os.readlink(self.entry)  # Python 3.7 compatibility
+        if not self.is_symlink():
+            raise NotASymlinkError()
+
+        # We want to get the "truest" form of the symlink
+        # If we use the readlink() of pathlib.Path directly, it gets thrown into the path parsing of pathlib
+        # Because DirectoryFilesystem may also be used with TargetPath, we specifically handle that case here
+        # and use os.readlink for host paths
+        if isinstance(self.entry, fsutil.TargetPath):
+            return self.entry.get().readlink()
+        else:
+            return os.readlink(self.entry)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()

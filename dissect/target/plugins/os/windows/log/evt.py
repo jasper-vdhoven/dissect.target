@@ -100,7 +100,7 @@ class WindowsEventlogsMixin:
 
         # resolve aliases (like `%systemroot%`) in the paths
         file_paths = [self.target.resolve(p) for p in file_paths]
-        file_paths = [self.target.fs.path(path) for path in file_paths if filename_regex.match(path)]
+        file_paths = [path for path in file_paths if filename_regex.match(str(path))]
 
         self.target.log.debug("Log files found in '%s': %d", self.EVENTLOG_REGISTRY_KEY, len(file_paths))
 
@@ -125,6 +125,9 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
         Yields dynamically created records based on the fields in the event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.

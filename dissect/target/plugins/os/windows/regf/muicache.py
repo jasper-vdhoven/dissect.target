@@ -1,7 +1,5 @@
 from typing import Generator
 
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
@@ -50,6 +48,9 @@ class MuiCachePlugin(Plugin):
             - https://forensafe.com/blogs/muicache.html
 
         Yields MuiCacheRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             index (varint): The index of the entry.
@@ -84,7 +85,7 @@ class MuiCachePlugin(Plugin):
                     index=index,
                     name=name,
                     value=entry.value,
-                    path=path.from_windows(entry_path),
+                    path=self.target.fs.path(entry_path),
                     _target=self.target,
                     _key=key,
                     _user=user,

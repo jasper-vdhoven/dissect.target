@@ -11,7 +11,7 @@ class FirewallPlugin(Plugin):
     """Plugin that parses firewall rules from the registry."""
 
     KEY = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
-    FIELD_MAP = {"app": "uri"}
+    FIELD_MAP = {"app": "path"}
     VALUE_MAP = {"active": lambda val: val == "TRUE"}
 
     def check_compatible(self) -> None:
@@ -26,6 +26,9 @@ class FirewallPlugin(Plugin):
         HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules registry key.
 
         Yields dynamic records with usually the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             key (string): The rule key name.

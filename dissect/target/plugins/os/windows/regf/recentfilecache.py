@@ -1,11 +1,10 @@
-from dissect import cstruct
-from flow.record.fieldtypes import path
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_recent_files_def = """
+recent_files_def = """
     struct header {
         uint32  magic;
         uint32  unk0;
@@ -19,8 +18,7 @@ c_recent_files_def = """
         wchar   path[length + 1];
     };
     """
-c_recent_files = cstruct.cstruct()
-c_recent_files.load(c_recent_files_def)
+c_recent_files = cstruct().load(recent_files_def)
 
 RecentFileCacheRecord = TargetRecordDescriptor(
     "windows/recentfilecache",
@@ -46,6 +44,9 @@ class RecentFileCachePlugin(Plugin):
         """Parse RecentFileCache.bcf.
 
         Yields RecentFileCacheRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             path (uri): The parsed path.
@@ -59,7 +60,7 @@ class RecentFileCachePlugin(Plugin):
                 entry.path = entry.path.rstrip("\x00")
 
                 yield RecentFileCacheRecord(
-                    path=path.from_windows(entry.path),
+                    path=self.target.fs.path(entry.path),
                     _target=self.target,
                 )
             except EOFError:

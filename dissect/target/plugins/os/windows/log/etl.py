@@ -13,6 +13,9 @@ from dissect.target.plugins.os.windows.datetime import parse_tzi
 class EtlRecordBuilder:
     RECORD_NAME = "filesystem/windows/etl"
 
+    def __init__(self):
+        self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
+
     def _build_record(self, etl_event: Event, etl_path: Path, target: Target):
         """Builds an ETL event record"""
 
@@ -51,7 +54,6 @@ class EtlRecordBuilder:
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    @lru_cache(maxsize=4096)
     def _create_event_descriptor(self, record_fields):
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
@@ -120,6 +122,9 @@ class EtlPlugin(Plugin):
 
         Yields dynamically created records based on the fields inside an ETL event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.
@@ -138,6 +143,9 @@ class EtlPlugin(Plugin):
 
         Yields dynamically created records based on the fields inside an ETL event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.
@@ -155,6 +163,9 @@ class EtlPlugin(Plugin):
 
         Yields dynamically created records based on the fields inside an ETL event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.

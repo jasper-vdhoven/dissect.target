@@ -1,7 +1,5 @@
 import re
 
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import (
     RegistryError,
     RegistryValueNotFoundError,
@@ -74,6 +72,9 @@ class ServicesPlugin(Plugin):
             - https://artifacts-kb.readthedocs.io/en/latest/sources/windows/ServicesAndDrivers.html
 
         Yields ServiceRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datatime): The last modified timestamp of the registry key.
@@ -100,7 +101,7 @@ class ServicesPlugin(Plugin):
 
                 try:
                     servicedll = key.subkey("Parameters").value("ServiceDll").value
-                    servicedll = path.from_windows(servicedll)
+                    servicedll = self.target.fs.path(servicedll)
                 except RegistryError:
                     pass
 
@@ -138,7 +139,7 @@ class ServicesPlugin(Plugin):
                                 image_path = image_path[: m.end(0)].strip()
                             else:
                                 pass
-                        image_path = path.from_windows(image_path)
+                        image_path = self.target.fs.path(image_path)
                 except RegistryError:
                     pass
 

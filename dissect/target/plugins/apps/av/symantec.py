@@ -199,10 +199,9 @@ class SymantecPlugin(Plugin):
 
     def check_compatible(self) -> None:
         for log_file in self.LOGS:
-            if self.target.fs.glob(log_file):
-                break
-        else:
-            raise UnsupportedPluginError("No Symantec SEP logs found")
+            if list(self.target.fs.glob(log_file)):
+                return
+        raise UnsupportedPluginError("No Symantec SEP logs found")
 
     def _fw_cell(self, line: list, cell_id: int) -> str:
         return line[cell_id].decode("utf-8")
@@ -294,6 +293,9 @@ class SymantecPlugin(Plugin):
         """Return log records.
 
         Yields SEPLogRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Timestamp associated with the event.
             virus (string): Name of the virus.
             user (string): Name of the user associated with the event.
@@ -327,6 +329,9 @@ class SymantecPlugin(Plugin):
         """Return log firewall records.
 
         Yields SEPFirewallRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Timestamp associated with the event.
             protocol (string): Protocol name associated with the firewall record.
             local_ip ("net.ipaddress"): Local IP address associated with the event.

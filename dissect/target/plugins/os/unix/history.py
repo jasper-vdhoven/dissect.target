@@ -11,7 +11,7 @@ from dissect.target.helpers.record import UnixUserRecord, create_extended_descri
 from dissect.target.plugin import Plugin, export, internal
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "linux/history",
+    "unix/history",
     [
         ("datetime", "ts"),
         ("string", "command"),
@@ -35,6 +35,7 @@ class CommandHistoryPlugin(Plugin):
         ("python", ".python_history"),
         ("sqlite", ".sqlite_history"),
         ("zsh", ".zsh_history"),
+        ("ash", ".ash_history"),
     )
 
     def __init__(self, target: Target):
@@ -51,7 +52,7 @@ class CommandHistoryPlugin(Plugin):
         for user_details in self.target.user_details.all_with_home():
             for shell, history_relative_path in self.COMMAND_HISTORY_RELATIVE_PATHS:
                 history_path = user_details.home_path.joinpath(history_relative_path)
-                if history_path.exists():
+                if history_path.is_file():
                     history_files.append((shell, history_path, user_details.user))
         return history_files
 
