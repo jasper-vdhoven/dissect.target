@@ -779,15 +779,15 @@ class OpenBSMPlugin(plugin.Plugin):
 
     @plugin.export(record=DynamicDescriptor(["datetime"]))
     def openbsm(self):
-        for entry in self.target.fs.path(self.LOGS_DIR_PATH).glob(self.GLOB):
-            if not entry.exists():
-                self.target.log.warning(f"Audit trail log file does not exist: {entry}")
+        for file in self.target.fs.path(self.LOGS_DIR_PATH).glob(self.GLOB):
+            if not file.exists():
+                self.target.log.warning(f"Audit trail log file does not exist: {file}")
 
-            self.target.log.info(f"Going to parse file: {entry}")
+            self.target.log.info(f"Going to parse file: {file}")
             try:
-                entry_data = entry.open()
+                file_data = file.open()
             except FilesystemError:
-                self.target.log.exception(f"Failed to open audit trail: {entry}")
+                self.target.log.exception(f"Failed to open audit trail: {file}")
                 continue
 
             audit_trail = OpenBSM(file_data, self.target)
