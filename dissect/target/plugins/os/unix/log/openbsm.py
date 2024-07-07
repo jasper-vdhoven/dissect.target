@@ -758,6 +758,10 @@ class RecordMagic(Enum):
 
 # TODO: add Solaris parsing support
 
+OpenBSMRecord = TargetRecordDescriptor(
+    "unix/log/openbsm", [("datetime", "ts"), ("varint", "ms"), ("string", "message"), ("string", "type")]
+)
+
 
 class OpenBSMPlugin(plugin.Plugin):
     """Plugin for fetching and parsing OpenBSM audit trails"""
@@ -786,8 +790,19 @@ class OpenBSMPlugin(plugin.Plugin):
                 self.target.log.exception(f"Failed to open audit trail: {entry}")
                 continue
 
-            for event in OpenBSM(entry_data):
-                self.target.log.info(f"Event: {event}")
+            audit_trail = OpenBSM(file_data, self.target)
+
+            for entry in audit_trail:
+                self.target.log.info(f"Event: {entry}")
+                yield OpenBSMRecord(
+                    ts=entry.get("ts"),
+                    ms=entry.get("ms"),
+                    type=entry.get("type"),
+                    message=entry.get("message"),
+                    _target=self.target,
+                )
+
+            self.target.log.info("End")
 
 
 class OpenBSM:
