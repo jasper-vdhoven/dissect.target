@@ -1,12 +1,10 @@
 from typing import Any, Optional, Generator, BinaryIO, Iterator
 from enum import Enum
-import logging
-import os
 
 from flow.record import Record
 from dissect.cstruct import cstruct
 from dissect.cstruct.utils import p32, hexdump
-from dissect.target import plugin
+from dissect.target import plugin, Target
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.exceptions import UnsupportedPluginError, FilesystemError
 
