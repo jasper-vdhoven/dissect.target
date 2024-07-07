@@ -806,101 +806,165 @@ class OpenBSMPlugin(plugin.Plugin):
 
 
 class OpenBSM:
-    def __init__(self, fh: BinaryIO) -> None:
+    def __init__(self, fh: BinaryIO, target: Target) -> None:
         fh.seek(0)
         self.fh = fh
-        self.target = logging.getLogger(__name__)
-        self.target.setLevel(os.getenv("DISSECT_LOG_OPENBSM", "INFO"))
+        self.target = target
 
     def __iter__(self) -> Iterator:
         try:
             while True:
+                date = None
+                ms = None
                 reclen, buf = self._fetch_check_header()
                 if reclen == 0:
                     break
                 bytes_read = 0
-                # print(f"[i] current byte: {buf[bytes_read]}")
                 while bytes_read < reclen:
+                    record = {
+                        "ts": date,
+                        "ms": ms,
+                        "type": "",
+                        "message": "",
+                    }
                     match buf[bytes_read]:
                         case RecordMagic.AU_TRAILER_T.value:
                             trailer_t = c_aurecord.au_trailer_t(buf[bytes_read + 1 :])
                             # sizeof au_trailer_t + 1 extra byte to go to the next struct
-                            bytes_read += 6 + 1
-                            yield trailer_t
+                            bytes_read += 7
+                            record["type"] = "trailer"
+                            for field in trailer_t.fields:
+                                record["message"] += f"{field}={trailer_t[field]} "
+                            yield record
                         case RecordMagic.AU_HEADER32_T.value:
                             header32_t = c_aurecord.au_header32_t(buf[bytes_read + 1 :])
                             # sizeof au_header32_t + 1 extra byte to go to the next struct
-                            bytes_read += 17 + 1
-                            yield header32_t
+                            bytes_read += 18
+                            date = int(str(header32_t.s) + str(header32_t.ms))
+                            ms = header32_t.ms
+                            record["ts"] = date
+                            record["ms"] = ms
+                            record["type"] = "header32"
+                            for field in header32_t.fields:
+                                record["message"] += f"{field}={header32_t[field]} "
+                            yield record
                         case RecordMagic.AU_HEADER32_EX_T.value:
                             header32ex_t = c_aurecord.au_header32_ex_t(buf[bytes_read + 1 :])
-                            bytes_read += (16 + 16 + 1 + 4) + 1
-                            yield header32ex_t
+                            bytes_read += 38
+                            record["type"] = "header32ex"
+                            for field in header32ex_t.fields:
+                                record["message"] += f"{field}={header32ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_DATA_T.value:
                             data_t = c_aurecord.au_data_t(buf[bytes_read + 1 :])
-                            bytes_read += 3 + data_t._sizes["data_items"] + 1
-                            yield data_t
+                            bytes_read += 4 + data_t._sizes["data_items"]
+                            record["type"] = "data"
+                            for field in data_t.fields:
+                                record["message"] += f"{field}={data_t[field]} "
+                            yield record
                         case RecordMagic.AU_IPC_T.value:
                             ipc_t = c_aurecord.au_ipc_t(buf[bytes_read + 1 :])
-                            bytes_read += 5 + 1
-                            yield ipc_t
+                            bytes_read += 6
+                            record["type"] = "ipc"
+                            for field in data_t.fields:
+                                record["message"] += f"{field}={ipc_t[field]} "
+                            yield record
                         case RecordMagic.AU_PATH_T.value:
                             path_t = c_aurecord.au_path_t(buf[bytes_read + 1 :])
                             # sizeof au_path_t + 1 extra byte to go to the next struct
-                            bytes_read += 2 + path_t.len + 1
-                            yield path_t
+                            bytes_read += 3 + path_t.len
+                            record["type"] = "path"
+                            for field in path_t.fields:
+                                record["message"] += f"{field}={path_t[field]} "
+                            yield record
                         case RecordMagic.AU_SUBJECT32_T.value:
                             subject32_t = c_aurecord.au_subject32_t(buf[bytes_read + 1 :])
                             # sizeof au_subject32_t + 1 extra byte to go to the next struct
-                            bytes_read += 36 + 1
-                            yield subject32_t
+                            bytes_read += 37
+                            record["type"] = "subject32"
+                            for field in subject32_t.fields:
+                                record["message"] += f"{field}={subject32_t[field]} "
+                            yield record
                         case RecordMagic.AU_PROC32_T.value:
                             proc32_t = c_aurecord.au_proc32_t(buf[bytes_read + 1 :])
-                            bytes_read += 36 + 1
-                            yield proc32_t
+                            bytes_read += 37
+                            record["type"] = "proc32"
+                            for field in proc32_t.fields:
+                                record["message"] += f"{field}={proc32_t[field]} "
+                            yield record
                         case RecordMagic.AU_RET32_T.value:
                             ret32_t = c_aurecord.au_ret32_t(buf[bytes_read + 1 :])
                             # sizeof au_ret32_t + 1 extra byte to go to the next struct
-                            bytes_read += 5 + 1
-                            yield ret32_t
+                            bytes_read += 6
+                            record["type"] = "ret32"
+                            for field in ret32_t.fields:
+                                record["message"] += f"{field}={ret32_t[field]} "
+                            yield record
                         case RecordMagic.AU_TEXT_T.value:
                             text_t = c_aurecord.au_text_t(buf[bytes_read + 1 :])
                             # sizeof au_text_t + 1 extra byte to go to the next struct
-                            bytes_read += text_t.len + 2 + 1
-                            yield text_t
+                            bytes_read += text_t.len + 3
+                            record["type"] = "text"
+                            for field in text_t.fields:
+                                record["message"] += f"{field}={text_t[field]} "
+                            yield record
                         case RecordMagic.AU_OPAQUE_T.value:
                             opaque_t = c_aurecord.au_opaque_t(buf[bytes_read + 1 :])
-                            bytes_read += 3 + opaque_t._sizes["data_items"] + 1
-                            yield opaque_t
+                            bytes_read += 4 + opaque_t._sizes["data_items"]
+                            record["type"] = "opaque"
+                            for field in opaque_t.fields:
+                                record["message"] += f"{field}={opaque_t[field]} "
+                            yield record
                         case RecordMagic.AU_INADDR_T.value:
                             inaddr_t = c_aurecord.au_inaddr_t(buf[bytes_read + 1 :])
-                            bytes_read += 4 + 1
-                            yield inaddr_t
+                            bytes_read += 5
+                            record["type"] = "inaddr"
+                            for field in inaddr_t.fields:
+                                record["message"] += f"{field}={inaddr_t[field]} "
+                            yield record
                         case RecordMagic.AU_IP_T.value:
                             ip_t = c_aurecord.au_ip_t(buf[bytes_read + 1 :])
-                            bytes_read += (4 + 8 + 8) + 1
-                            yield ip_t
+                            bytes_read += 21
+                            record["type"] = "ip"
+                            for field in ip_t.fields:
+                                record["message"] += f"{field}={ip_t[field]} "
+                            yield record
                         case RecordMagic.AU_IPORT_T.value:
                             iport_t = c_aurecord.au_iport_t(buf[bytes_read + 1 :])
-                            bytes_read += 2 + 1
-                            yield iport_t
+                            bytes_read += 3
+                            record["type"] = "iport"
+                            for field in iport_t.fields:
+                                record["message"] += f"{field}={iport_t[field]} "
+                            yield record
                         case RecordMagic.AU_ARG32_T.value:
                             arg32_t = c_aurecord.au_arg32_t(buf[bytes_read + 1 :])
                             # sizeof au_arg32_t + 1 extra byte to go to the next struct
-                            bytes_read += arg32_t.len + 7 + 1
-                            yield arg32_t
+                            bytes_read += arg32_t.len + 8
+                            record["type"] = "arg32"
+                            for field in arg32_t.fields:
+                                record["message"] += f"{field}={arg32_t[field]} "
+                            yield record
                         case RecordMagic.AU_SOCKET_T.value:
                             socket_t = c_aurecord.au_socket_t(buf[bytes_read + 1 :])
-                            bytes_read += (6 + 8) + 1
-                            yield socket_t
+                            bytes_read += 15
+                            record["type"] = "socket"
+                            for field in socket_t.fields:
+                                record["message"] += f"{field}={socket_t[field]} "
+                            yield record
                         case RecordMagic.AU_SEQ_T.value:
                             seq_t = c_aurecord.au_seq_t(buf[bytes_read + 1 :])
-                            bytes_read += 4 + 1
-                            yield seq_t
+                            bytes_read += 5
+                            record["type"] = "seq"
+                            for field in seq_t.fields:
+                                record["message"] += f"{field}={seq_t[field]} "
+                            yield record
                         case RecordMagic.AU_IPCPERM_T.value:
                             ipcperm_t = c_aurecord.au_ipcperm_t(buf[bytes_read + 1 :])
-                            bytes_read += 28 + 1
-                            yield ipcperm_t
+                            bytes_read += 29
+                            record["type"] = "ipcperm"
+                            for field in ipcperm_t.fields:
+                                record["message"] += f"{field}={ipcperm_t[field]} "
+                            yield record
                         case RecordMagic.AU_EXECARG_T.value:
                             execarg_t = c_aurecord.au_execarg_t(buf[bytes_read + 1 :])
                             """
@@ -910,93 +974,153 @@ class OpenBSM:
                             length = 0
                             for items in execarg_t.text:
                                 length += len(items) + 1
-                            length += 4 + 1
+                            length += 5
                             bytes_read += length
-                            yield execarg_t
+                            record["type"] = "execarg"
+                            for field in execarg_t.fields:
+                                record["message"] += f"{field}={execarg_t[field]} "
+                            yield record
                         case RecordMagic.AU_EXECENV_T.value:
                             execenv_t = c_aurecord.au_execenv_t(buf[bytes_read + 1 :])
                             length = 0
                             for items in execenv_t.text:
                                 length += len(items) + 1
-                            length += 4 + 1
+                            length += 5
                             bytes_read += length
-                            yield execenv_t
+                            record["type"] = "execenv"
+                            for field in execenv_t.fields:
+                                record["message"] += f"{field}={execenv_t[field]} "
+                            yield record
                         case RecordMagic.AU_ATTR32_t.value:
                             attr32_t = c_aurecord.au_attr32_t(buf[bytes_read + 1 :])
                             # sizeof au_attr32_t + 1 extra byte to go to the next struct
-                            bytes_read += 28 + 1
-                            yield attr32_t
+                            bytes_read += 29
+                            record["type"] = "attr32"
+                            for field in attr32_t.fields:
+                                record["message"] += f"{field}={attr32_t[field]} "
+                            yield record
                         case RecordMagic.AU_EXIT_T.value:
                             exit_t = c_aurecord.au_exit_t(buf[bytes_read + 1 :])
-                            bytes_read += 8 + 1
-                            yield exit_t
+                            bytes_read += 9
+                            record["type"] = "exit"
+                            for field in exit_t.fields:
+                                record["message"] += f"{field}={exit_t[field]} "
+                            yield record
                         case RecordMagic.AU_ARG64_T.value:
                             arg64_t = c_aurecord.au_arg64_t(buf[bytes_read + 1 :])
-                            bytes_read += (1 + 8 + 2) + arg64_t.len + 1
-                            yield arg64_t
+                            bytes_read += 12 + arg64_t.len
+                            record["type"] = "arg64"
+                            for field in arg64_t.fields:
+                                record["message"] += f"{field}={arg64_t[field]} "
+                            yield record
                         case RecordMagic.AU_RET64_t.value:
                             ret64_t = c_aurecord.au_ret64_t(buf[bytes_read + 1 :])
-                            bytes_read += 9 + 1
-                            yield ret64_t
+                            bytes_read += 10
+                            record["type"] = "ret64"
+                            for field in ret64_t.fields:
+                                record["message"] += f"{field}={ret64_t[field]} "
+                            yield record
                         case RecordMagic.AU_ATTR64_T.value:
                             attr64_t = c_aurecord.au_attr64_t(buf[bytes_read + 1 :])
-                            bytes_read += 32 + 1
-                            yield attr64_t
+                            bytes_read += 33
+                            record["type"] = "attr64"
+                            for field in attr64_t.fields:
+                                record["message"] += f"{field}={attr64_t[field]} "
+                            yield record
                         case RecordMagic.AU_HEADER64_T.value:
                             header64_t = c_aurecord.au_header64_t(buf[bytes_read + 1 :])
-                            bytes_read += 25 + 1
-                            yield header64_t
+                            bytes_read += 26
+                            record["type"] = "header64"
+                            for field in header64_t.fields:
+                                record["message"] += f"{field}={header64_t[field]} "
+                            yield record
                         case RecordMagic.AU_SUBJECT64_T.value:
                             subject64_t = c_aurecord.au_subject64_t(buf[bytes_read + 1 :])
-                            bytes_read += 28 + 12 + 1
-                            yield subject64_t
+                            bytes_read += 41
+                            record["type"] = "subject64"
+                            for field in subject64_t.fields:
+                                record["message"] += f"{field}={subject64_t[field]} "
+                            yield record
                         case RecordMagic.AU_PROCESS64_T.value:
                             proc64_t = c_aurecord.au_proc64_t(buf[bytes_read + 1 :])
-                            bytes_read += 28 + 12 + 1
-                            yield proc64_t
+                            bytes_read += 41
+                            record["type"] = "proc64"
+                            for field in proc64_t.fields:
+                                record["message"] += f"{field}={proc64_t[field]} "
+                            yield record
                         case RecordMagic.AU_HEADER64_EXT_T.value:
                             header64_ex_t = c_aurecord.au_header64_ex_t(buf[bytes_read + 1 :])
-                            bytes_read += 12 + 4 + 1 + 16 + 1
-                            yield header64_ex_t
+                            bytes_read += 34
+                            record["type"] = "header64ex"
+                            for field in header64_ex_t.fields:
+                                record["message"] += f"{field}={header64_ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_SUBJECT32EX_T.value:
                             subject32ex_t = c_aurecord.au_subject32ex_t(buf[bytes_read + 1 :])
                             # sizeof au_subject32ex_t + 1 extra byte to go to the next struct
-                            bytes_read += 40 + 1
-                            yield subject32ex_t
+                            bytes_read += 41
+                            record["type"] = "subject32ex"
+                            for field in subject32ex_t.fields:
+                                record["message"] += f"{field}={subject32ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_PROC32EX_T.value:
                             proc32ex_t = c_aurecord.au_proc32ex_t(buf[bytes_read + 1 :])
-                            bytes_read += (28 + 12) + 1
-                            yield proc32ex_t
+                            bytes_read += 41
+                            record["type"] = "proc32ex"
+                            for field in proc32ex_t.fields:
+                                record["message"] += f"{field}={proc32ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_SUBJECT64EX_T.value:
                             subject64ex_t = c_aurecord.au_subject64ex_t(buf[bytes_read + 1 :])
-                            bytes_read += 28 + 12 + 16 + 1
-                            yield subject64ex_t
+                            bytes_read += 57
+                            record["type"] = "subject64ex"
+                            for field in subject64ex_t.fields:
+                                record["message"] += f"{field}={subject64ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_PROCESS64EX_T.value:
                             process64ex_t = c_aurecord.au_proc64ex_t(buf[bytes_read + 1 :])
-                            bytes_read += 28 + 12 + 16 + 1
-                            yield process64ex_t
+                            bytes_read += 57
+                            record["type"] = "process64"
+                            for field in process64ex_t.fields:
+                                record["message"] += f"{field}={process64ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_INADDR_EX_T.value:
                             inaddr_ex_t = c_aurecord.au_inaddr_ex_t(buf[bytes_read + 1 :])
-                            bytes_read += 20 + 1
-                            yield inaddr_ex_t
+                            bytes_read += 21
+                            record["type"] = "inaddr"
+                            for field in inaddr_ex_t.fields:
+                                record["message"] += f"{field}={inaddr_ex_t[field]} "
+                            yield record
                         case RecordMagic.AU_SOCKETEX32_T.value:
                             socketex_t = c_aurecord.au_socket_ex_t(buf[bytes_read + 1 :])
                             length = socketex_t.atype * 2
                             bytes_read += (10 + length) + 1
-                            yield socketex_t
+                            record["type"] = "socketex"
+                            for field in socketex_t.fields:
+                                record["message"] += f"{field}={socketex_t[field]} "
+                            yield record
                         case RecordMagic.AU_SOCKETINET32_T.value:
                             socketinet32_t = c_aurecord.au_socketinet32_t(buf[bytes_read + 1 :])
-                            bytes_read += 8 + 1
-                            yield socketinet32_t
+                            bytes_read += 9
+                            record["type"] = "socketinet32"
+                            for field in socketinet32_t.fields:
+                                record["message"] += f"{field}={socketinet32_t[field]} "
+                            yield record
                         case RecordMagic.AU_SOCKETINET128_T.value:
                             socketinet128_t = c_aurecord.au_socketinet128_t(buf[bytes_read + 1 :])
-                            bytes_read += 20 + 1
-                            yield socketinet128_t
+                            bytes_read += 21
+                            record["type"] = "socketinet128"
+                            for field in socketinet128_t.fields:
+                                record["message"] += f"{field}={socketinet128_t[field]} "
+                            yield record
                         case RecordMagic.AU_UNIXSOCK_T.value:
                             unixsock_t = c_aurecord.au_unixsock_t(buf[bytes_read + 1 :])
                             # TODO: Find a way to dynamically calculate the size of this record
                             bytes_read += (2 + unixsock_t._sizes["path"]) + 1
-                            yield unixsock_t
+                            record["type"] = "unixsock"
+                            for field in unixsock_t.fields:
+                                record["message"] += f"{field}={unixsock_t[field]} "
+                            yield record
                         case RecordMagic.AU_IDENTITY_INFO.value:
                             identity_info = c_aurecord.au_identity_info(buf[bytes_read + 1 :])
                             length = (
@@ -1004,25 +1128,31 @@ class OpenBSM:
                                 + identity_info.team_id_length
                                 + identity_info.cdhash_length
                             )
-                            bytes_read += (4 + 2 + 2 + 2 + 2) + length + 1
-                            yield identity_info
+                            bytes_read += 12 + length + 1
+                            record["type"] = "identity_info"
+                            for field in identity_info.fields:
+                                record["message"] += f"{field}={identity_info[field]} "
+                            yield record
                         case RecordMagic.AU_INVALID_T.value:
                             invalid_t = c_aurecord.au_invalid_t(buf[bytes_read + 1 :])
-                            bytes_read += 2 + invalid_t.len + 1
-                            yield invalid_t
+                            bytes_read += 3 + invalid_t.len
+                            record["type"] = "invalid"
+                            for field in invalid_t.fields:
+                                record["message"] += f"{field}={invalid_t[field]} "
+                            yield record
                         case _:
                             print(hexdump(buf))
                             print(f"[i] First byte of buf: {buf[bytes_read]}")
                             print(f"[i] Type of buf:       {type(buf[bytes_read])}")
                             break
         except EOFError:
-            self.target.info("EOF reached")
+            self.target.log.info("EOF reached")
 
     def _fetch_check_header(self):
         header_magic = self.fh.read(1)
         match header_magic:
             case b"\x14":
-                self.target.info("Valid magic; parsing record length")
+                self.target.log.info("Valid magic; parsing record length")
                 # Get the size for the record
                 recsize: int = c_aurecord.uint32(self.fh)
                 full_rec = self.fh.read(recsize - 5)
@@ -1030,8 +1160,8 @@ class OpenBSM:
                 buf: bytes = header_magic + p32(recsize, "big") + full_rec
                 return recsize, buf
             case b"":
-                self.target.info("EOF reached")
+                self.target.log.info("EOF reached")
                 return 0, 0
             case _:
-                self.target.error(f"Invalid record: {hexdump(self.fh.read(10))}")
+                self.target.log.error(f"Invalid record: {hexdump(self.fh.read(10))}")
                 raise Exception
